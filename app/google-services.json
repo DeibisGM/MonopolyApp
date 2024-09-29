@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "725284309258",
+    "firebase_url": "https://money-manager-32ba9-default-rtdb.firebaseio.com",
+    "project_id": "money-manager-32ba9",
+    "storage_bucket": "money-manager-32ba9.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:725284309258:android:fafff9947e2069435892f3",
+        "android_client_info": {
+          "package_name": "com.example.monopolymoney"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDOw-cPGrllWsqBYsjDxiDtXBsS0vcBnlk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:725284309258:android:171611f719a6eb095892f3",
+        "android_client_info": {
+          "package_name": "com.example.monopolymoney.presentation"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDOw-cPGrllWsqBYsjDxiDtXBsS0vcBnlk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
