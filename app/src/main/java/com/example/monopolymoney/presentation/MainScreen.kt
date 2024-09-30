@@ -18,18 +18,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.monopolymoney.R
@@ -37,24 +33,14 @@ import com.example.monopolymoney.data.Player
 import com.example.monopolymoney.data.Transaction
 import com.example.monopolymoney.data.TransactionDetails
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.res.imageResource
+import androidx.compose.foundation.layout.size
 
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.BlendMode
-
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
+private val My_yellow = Color(0xFFFFD67E)
 
 private val GeneralPadding = 16.dp
 private val ButtonHeight = 55.dp
@@ -228,28 +214,49 @@ fun WaitingRoomScreen(viewModel: MonopolyViewModel, players: List<Player>, roomC
 
 
 
+//@Composable
+//fun RepeatingBackgroundPattern(
+//    spacing: Float = 12f,
+//    backgroundColor: Color = Color(0xFF334051) // Color de fondo en HEX
+//) {
+//    val patternImage = ImageBitmap.imageResource(R.drawable.tile2)
+//
+//    Canvas(modifier = Modifier.fillMaxSize()) {
+//        // Dibuja el color de fondo
+//        drawRect(color = backgroundColor, size = size)
+//
+//        val imageWidth = patternImage.width.toFloat()
+//        val imageHeight = patternImage.height.toFloat()
+//
+//        // Dibuja la imagen en un patrón repetido con espaciado
+//        for (x in 0..(size.width / (imageWidth + spacing)).toInt()) {
+//            for (y in 0..(size.height / (imageHeight + spacing)).toInt()) {
+//                drawImage(
+//                    image = patternImage,
+//                    topLeft = Offset(
+//                        x * (imageWidth + spacing),
+//                        y * (imageHeight + spacing)
+//                    )
+//                )
+//            }
+//        }
+//    }
+//}
 
-
-
-
-
-
-
-@Preview(showBackground = true)
 @Composable
 fun MyScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF354359), // Color inicial del degradado (azul oscuro)
-                         //Color(0xFF354359), // Color inicial del degradado (azul oscuro)
-                        Color(0xFF1B1E28),  // Color final del degradado (azul claro)
-                                //Color(0xFF0C0D11)  // Color final del degradado (azul claro)
-                    )
-                )
+                Color(0xFF141F23)
+//                brush = Brush.verticalGradient(
+//                    colors = listOf(
+//                        Color(0xFF354359), // Color inicial del degradado (azul oscuro)
+//                        Color(0xFF0F1118),  // Color final del degradado (azul claro)
+//
+//                    )
+//                )
             )
     ) {
         Column(
@@ -276,6 +283,7 @@ fun MyScreen() {
 
 @Composable
 fun TopSection() {
+    val my_yellow = Color(0xFFFFD67E) // Por ejemplo, un color amarillo
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth()
@@ -284,8 +292,9 @@ fun TopSection() {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(25.dp))
+                .aspectRatio(16f / 8f)
+                .clip(RoundedCornerShape(30.dp))
+                .border(0.5.dp, my_yellow, RoundedCornerShape(30.dp)) // Cambia el grosor y el color del borde según tus necesidades
         ) {
             Image(
                 painter = painterResource(id = R.drawable.city2),
@@ -294,6 +303,7 @@ fun TopSection() {
                 modifier = Modifier.fillMaxSize()
             )
         }
+
 
         // Espacio entre la imagen y la tarjeta
         Spacer(modifier = Modifier.height(16.dp))
@@ -318,7 +328,7 @@ fun InfoCard(
         Modifier
             .fillMaxWidth()
             .border(
-                width = 0.5.dp,
+                width = 0.8.dp,
                 brush = Brush.verticalGradient(
                     colors = listOf(
                         Color.White.copy(alpha = 0f),  // Arriba, opacidad 0%
@@ -338,7 +348,7 @@ fun InfoCard(
         colors = if (isSpecialCard) {
             CardDefaults.cardColors(containerColor = Color.Transparent) // Fondo transparente
         } else {
-            CardDefaults.cardColors(containerColor = Color(0xFF273140)) // Color normal
+            CardDefaults.cardColors(containerColor = Color.Transparent) // Color normal
         }
     ) {
         Row(
@@ -381,15 +391,15 @@ fun UserCard(avatarResId: Int) {
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
-                    text = "Yeimer gay",
+                    text = "Casandra",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     fontFamily = FontFamily(Font(R.font.multipixelregular)),
-                    color = Color(0xFFFFD67E)
+                    color = My_yellow
                 )
                 Spacer(modifier = Modifier.height(0.dp))
                 Text(
-                    text = "$1500",
+                    text = "$1755",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     fontFamily = FontFamily(Font(R.font.multipixelregular)),
@@ -458,8 +468,8 @@ fun TransactionCard(
                 Text(
                     text = "Transaction",
                     fontSize = 16.sp,
-                    fontFamily = FontFamily(Font(R.font.carisma700)),
-                    color = Color(0xFFFFD67E)
+                    fontFamily = FontFamily(Font(R.font.carisma600)),
+                    color = My_yellow
                 )
                 Spacer(modifier = Modifier.height(0.dp))
                 Text(
@@ -471,11 +481,11 @@ fun TransactionCard(
             }
             Text(
                 text = "$${amount.toInt()}",
-                color = Color.White,
-                fontFamily = FontFamily(Font(R.font.carisma700)),
                 fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
+                fontFamily = FontFamily(Font(R.font.carisma600)),
+                color = Color(0xFFD2D2D2)
             )
+
         }
     }
 }
@@ -493,26 +503,26 @@ fun EventLogSection(modifier: Modifier = Modifier) {
                 .padding(bottom = 10.dp).padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Registro de eventos",
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = Color(0xFFFFD67E),
-                fontFamily = FontFamily(Font(R.font.carisma700)),
-                modifier = Modifier.padding(end = 16.dp)
-            )
+//            Text(
+//                text = "Registro de eventos",
+//                fontWeight = FontWeight.Bold,
+//                fontSize = 18.sp,
+//                color = Color(0xFFFFD67E),
+//                fontFamily = FontFamily(Font(R.font.carisma700)),
+//                modifier = Modifier.padding(end = 16.dp)
+//            )
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .height(1.dp)
-                    .background(Color(0xFFFFD67E))
+                    .height(0.5.dp)
+                    .background(My_yellow)
             )
         }
 
         // List of transactions
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             items(transactionList) { transaction ->
                 TransactionCard(

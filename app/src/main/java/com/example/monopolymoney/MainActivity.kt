@@ -4,7 +4,6 @@ import LoginScreen
 import MonopolyViewModel
 import MonopolyViewModelFactory
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -62,6 +61,7 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberNavController()
                     //MonopolyApp(navController, viewModel)
                     MyScreen();
+
                 }
             }
         }
