@@ -3,10 +3,15 @@ package com.example.monopolymoney
 import LoginScreen
 import MonopolyViewModel
 import MonopolyViewModelFactory
+import android.os.Build
 import android.os.Bundle
+import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -20,9 +25,13 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.example.monopolymoney.presentation.GridGame
 import com.example.monopolymoney.presentation.LobbyScreen
 import com.example.monopolymoney.presentation.MoneyTransferScreen
 import com.example.monopolymoney.presentation.MyScreen
@@ -61,6 +70,7 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberNavController()
                     //MonopolyApp(navController, viewModel)
                     MyScreen();
+                    //GridGame()
 
                 }
             }
