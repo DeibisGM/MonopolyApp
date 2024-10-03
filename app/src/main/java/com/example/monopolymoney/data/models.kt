@@ -8,47 +8,47 @@ import kotlinx.parcelize.Parcelize
 
 
 data class Player(
-    val id: String? = null, // Cambiado a null por defecto para reflejar el tipo String?
-    val name: String? = null, // Cambiado a null por defecto para reflejar el tipo String?
-    val balance: Int = 0
+    val id: String? = null,
+    val name: String? = null,
+    val balance: Int = 0,
+    val profileImageResId: Int = 0 // Nuevo campo para el ID del recurso de la imagen de perfil
 ) {
-    fun toMap(): Map<String, Any?> { // Cambiado a Any? para permitir valores nulos
+    fun toMap(): Map<String, Any?> {
         return mapOf(
             "id" to id,
             "name" to name,
-            "balance" to balance
+            "balance" to balance,
+            "profileImageResId" to profileImageResId
         )
     }
 
     companion object {
-        fun fromMap(map: Map<String, Any?>): Player? { // Cambiado a Any? para permitir valores nulos
+        fun fromMap(map: Map<String, Any?>): Player? {
             return try {
                 Player(
-                    id = map["id"] as? String, // Se mantiene como String?
-                    name = map["name"] as? String, // Se mantiene como String?
-                    balance = (map["balance"] as? Long)?.toInt() ?: 0
+                    id = map["id"] as? String,
+                    name = map["name"] as? String,
+                    balance = (map["balance"] as? Long)?.toInt() ?: 0,
+                    profileImageResId = (map["profileImageResId"] as? Long)?.toInt() ?: 0
                 )
             } catch (e: ClassCastException) {
-                // Manejo de error si el tipo es incorrecto
                 null
             }
         }
     }
 }
 
-
-
 data class Transaction(
     val id: Int = 0,
-    val fromPlayer: String = "", // -1 para el banco
-    val toPlayer: String = "",
+    val fromPlayerId: String = "", // Cambiado de fromPlayer a fromPlayerId
+    val toPlayerId: String = "",   // Cambiado de toPlayer a toPlayerId
     val amount: Int = 0,
 ) {
     fun toMap(): Map<String, Any> {
         return mapOf(
             "id" to id,
-            "fromPlayer" to fromPlayer,
-            "toPlayer" to toPlayer,
+            "fromPlayerId" to fromPlayerId,
+            "toPlayerId" to toPlayerId,
             "amount" to amount
         )
     }
@@ -58,16 +58,16 @@ data class Transaction(
             return try {
                 Transaction(
                     id = (map["id"] as? Number)?.toInt() ?: 0,
-                    fromPlayer = map["fromPlayer"] as String,
-                    toPlayer = map["toPlayer"] as String,
+                    fromPlayerId = map["fromPlayerId"] as String,
+                    toPlayerId = map["toPlayerId"] as String,
                     amount = (map["amount"] as? Number)?.toInt() ?: 0
                 )
             } catch (e: ClassCastException) {
-                // Manejo de error si el tipo es incorrecto
                 null
             }
         }
-    }}
+    }
+}
 
 data class TransactionDetails(
     val fromName: String = "",
@@ -96,25 +96,26 @@ data class GameState(
 
 @Parcelize
 data class PlayerParcelable(
-    val id: String? = null, // Cambiado a String? con valor por defecto null
-    val name: String? = null, // Cambiado a String? con valor por defecto null
-    val balance: Int = 0
+    val id: String? = null,
+    val name: String? = null,
+    val balance: Int = 0,
+    val profileImageResId: Int = 0
 ) : Parcelable {
-    fun toPlayer() = Player(id, name, balance) // Conversión a Player con String?
+    fun toPlayer() = Player(id, name, balance, profileImageResId)
 }
 
-fun Player.toParcelable() = PlayerParcelable(id, name, balance) // Conversión a PlayerParcelable
+fun Player.toParcelable() = PlayerParcelable(id, name, balance, profileImageResId)
 
 // Transaction.kt
 
 @Parcelize
 data class TransactionParcelable(
     val id: Int,
-    val fromPlayer: String,
-    val toPlayer: String,
+    val fromPlayerId: String,
+    val toPlayerId: String,
     val amount: Int
 ) : Parcelable {
-    fun toTransaction() = Transaction(id, fromPlayer, toPlayer, amount)
+    fun toTransaction() = Transaction(id, fromPlayerId, toPlayerId, amount)
 }
 
-fun Transaction.toParcelable() = TransactionParcelable(id, fromPlayer, toPlayer, amount)
+fun Transaction.toParcelable() = TransactionParcelable(id, fromPlayerId, toPlayerId, amount)

@@ -1,5 +1,3 @@
-import MonopolyViewModel
-import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -12,10 +10,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.monopolymoney.R
+import com.example.monopolymoney.viewmodel.DataViewModel
 
 @Composable
 fun LoginScreen(
-    viewModel: MonopolyViewModel,
+    viewModel: DataViewModel,
     onLoginSuccess: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
@@ -83,6 +83,7 @@ fun LoginScreen(
         ) {
             Text(text = "Log In")
         }
+
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
@@ -108,6 +109,7 @@ fun LoginScreen(
             onDismiss = { /* Do nothing, prevent dismissal */ },
             onConfirm = { name ->
                 viewModel.setName(name)
+                viewModel.setProfileImageResId(R.drawable.faces01)
                 showNameDialog = false
             }
         )

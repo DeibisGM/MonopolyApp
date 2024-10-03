@@ -38,7 +38,9 @@ fun MoneyTransferScreen(
     myPlayerId: String,
     onTransactionComplete: (amount: Int, toPlayerId: String) -> Unit,
     onCancel: () -> Unit,
-    isBankMode: Boolean = false  // New parameter to determine if it's bank mode
+    isBankMode: Boolean = false,
+    isHost: Boolean = false,
+    isMyTurn: Boolean = false
 ) {
     var amount by remember { mutableStateOf("0") }
     var isInitialValue by remember { mutableStateOf(true) }
@@ -48,6 +50,18 @@ fun MoneyTransferScreen(
 
     // Find the current player object
     val currentPlayerObject = players.find { it.id == myPlayerId }
+
+    // Determine if the transaction should be allowed
+    val canMakeTransaction = when {
+        isBankMode -> isHost // Host can always use bank
+        else -> isMyTurn // Regular transfers only on your turn
+    }
+
+    // Filter recipients based on mode and permissions
+    val availableRecipients = when {
+        isBankMode -> players // Bank can transfer to anyone, including self
+        else -> players.filter { it.id != myPlayerId } // Can't transfer to self in normal mode
+    }
 
     MaterialTheme(colorScheme = DarkColorScheme) {
         Column(
@@ -63,12 +77,18 @@ fun MoneyTransferScreen(
             ) {
                 Column(modifier = Modifier.padding(8.dp)) {
                     Spacer(modifier = Modifier.height(16.dp))
-                    TopBar(onCancel, isBankMode)
+                    TopBar(
+                        onCancel = onCancel,
+                        isBankMode = isBankMode,
+                        //isEnabled = canMakeTransaction
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
                     RecipientSelector(
-                        selectedRecipient,
-                        if (isBankMode) players else players.filter { it.id != myPlayerId }
-                    ) { selectedRecipient = it }
+                        selectedRecipient = selectedRecipient,
+                        players = availableRecipients,
+                        enabled = canMakeTransaction,
+                        onRecipientSelected = { selectedRecipient = it }
+                    )
                     Spacer(modifier = Modifier.height(25.dp))
                     AmountDisplay(amount)
                 }
@@ -97,14 +117,6 @@ fun MoneyTransferScreen(
                         } else {
                             currentPlayerObject?.let {
                                 PaymentSourceCard(it.balance)
-                            } ?: run {
-                                Text(
-                                    "Error: Player not found. ID: $myPlayerId",
-                                    color = Color.Red,
-                                    fontSize = 22.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(16.dp)
-                                )
                             }
                         }
 
@@ -124,18 +136,18 @@ fun MoneyTransferScreen(
                                     amount = "0"
                                     isInitialValue = true
                                 }
-                            }
+                            },
+                            //enabled = canMakeTransaction
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         SendButton(
-                            enabled = selectedRecipient != null && amount.toIntOrNull() ?: 0 > 0,
+                            enabled = canMakeTransaction && selectedRecipient != null && amount.toIntOrNull() ?: 0 > 0,
                             onSendMoney = {
                                 handleTransaction(
                                     currentPlayerObject,
                                     selectedRecipient,
                                     amount.toIntOrNull() ?: 0,
                                     onTransactionComplete,
-                                    onCancel,
                                     isBankMode
                                 ) { error ->
                                     errorMessage = error
@@ -144,6 +156,15 @@ fun MoneyTransferScreen(
                             },
                             isBankMode = isBankMode
                         )
+
+                        if (!canMakeTransaction) {
+                            Text(
+                                text = if (isBankMode) "Only the host can make bank transfers"
+                                else "You can only make transfers during your turn",
+                                color = Color.Red,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                        }
 
                         if (showErrorDialog) {
                             AlertDialog(
@@ -164,12 +185,68 @@ fun MoneyTransferScreen(
     }
 }
 
+@Composable
+fun RecipientSelector(
+    selectedRecipient: Player?,
+    players: List<Player>,
+    enabled: Boolean,
+    onRecipientSelected: (Player) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Button(
+            onClick = { if (enabled) expanded = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (enabled) Color(0xFF363636) else Color(0xFF262626),
+                contentColor = if (enabled) Color.White else Color.Gray
+            ),
+            shape = RoundedCornerShape(8.dp),
+            enabled = enabled
+        ) {
+            Text(
+                selectedRecipient?.name ?: "Select Recipient",
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Start,
+                fontSize = 18.sp
+            )
+            Icon(
+                imageVector = Icons.Filled.ArrowDropDown,
+                contentDescription = "Dropdown Arrow"
+            )
+        }
+
+        DropdownMenu(
+            expanded = expanded && enabled,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF363636))
+        ) {
+            players.forEach { player ->
+                DropdownMenuItem(
+                    text = { player.name?.let { Text(it, color = Color.White) } },
+                    onClick = {
+                        onRecipientSelected(player)
+                        expanded = false
+                    },
+                    colors = MenuDefaults.itemColors(
+                        textColor = Color.White
+                    )
+                )
+            }
+        }
+    }
+}
+
 private fun handleTransaction(
     currentPlayer: Player?,
     selectedRecipient: Player?,
     amount: Int,
     onTransactionComplete: (amount: Int, toPlayerId: String) -> Unit,
-    onCancel: () -> Unit,
     isBankMode: Boolean,
     onError: (String) -> Unit
 ) {

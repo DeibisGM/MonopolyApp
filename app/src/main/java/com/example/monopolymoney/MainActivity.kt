@@ -1,61 +1,43 @@
 package com.example.monopolymoney
 
 import LoginScreen
-import MonopolyViewModel
-import MonopolyViewModelFactory
-import android.os.Build
 import android.os.Bundle
-import android.view.View
-import android.view.WindowInsets
-import android.view.WindowInsetsController
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.ui.Modifier
-import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.compose.rememberNavController
-import com.example.monopolymoney.ui.theme.Shapes
-import com.example.monopolymoney.ui.theme.Typographys
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.example.monopolymoney.presentation.GridGame
+import androidx.navigation.compose.rememberNavController
 import com.example.monopolymoney.presentation.LobbyScreen
 import com.example.monopolymoney.presentation.MoneyTransferScreen
-import com.example.monopolymoney.presentation.MyScreen
-import com.example.monopolymoney.viewmodels.UserViewModel
+import com.example.monopolymoney.ui.theme.Shapes
+import com.example.monopolymoney.ui.theme.Typographys
+import com.example.monopolymoney.viewmodel.DataViewModel
 import com.google.firebase.Firebase
 import com.google.firebase.analytics.analytics
 
 class MainActivity : ComponentActivity() {
-    private lateinit var viewModel: MonopolyViewModel
-    private val userViewModel: UserViewModel by viewModels()
+    private lateinit var viewModel: DataViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Firebase.analytics
 
-        // Use ViewModelFactory to create MonopolyViewModel
-        val factory = MonopolyViewModelFactory(application)
-        viewModel = ViewModelProvider(this, factory)[MonopolyViewModel::class.java]
-
-        userViewModel.createUserIfNotExists()
-
-        savedInstanceState?.let {
-            viewModel.restoreState(it)
-        }
+        // Initialize DataViewModel using its Factory
+        viewModel = ViewModelProvider(
+            this,
+            DataViewModel.Factory(application)
+        )[DataViewModel::class.java]
 
         setContent {
             MaterialTheme(
@@ -68,27 +50,15 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
-                    //MonopolyApp(navController, viewModel)
-                    MyScreen();
-                    //GridGame()
-
+                    MonopolyApp(navController, viewModel)
                 }
             }
         }
     }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        viewModel.saveState(outState)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-    }
 }
 
 @Composable
-fun MonopolyApp(navController: NavHostController, viewModel: MonopolyViewModel) {
+fun MonopolyApp(navController: NavHostController, viewModel: DataViewModel) {
     val authState by viewModel.authState.collectAsState()
 
     NavHost(navController = navController, startDestination = "auth") {
@@ -110,76 +80,76 @@ fun MonopolyApp(navController: NavHostController, viewModel: MonopolyViewModel) 
                 onNavigateToBankTransfer = { navController.navigate("bankTransfer") }
             )
         }
+
         composable("moneyTransfer") {
             val players by viewModel.players.collectAsState()
-            val myPlayerId by viewModel.playerId.collectAsState()
+            val currentPlayer by viewModel.currentPlayer.collectAsState()
+            val roomCode by viewModel.roomCode.collectAsState()
+            val hostId by viewModel.hostId.collectAsState()
+            val userId by viewModel.userId.collectAsState()
 
-            myPlayerId?.let { id ->
-                MoneyTransferScreen(
-                    players = players,
-                    myPlayerId = id,
-                    onTransactionComplete = { amount, toPlayerId ->
-                        viewModel.makeTransaction(id, toPlayerId, amount)
-                        navController.popBackStack()
-                    },
-                    onCancel = { navController.popBackStack() },
-                    isBankMode = false
-                )
-            } ?: run {
-                Text("Error: Player ID not found")
-            }
+            currentPlayer?.let { playerId ->
+                roomCode?.let { code ->
+                    MoneyTransferScreen(
+                        players = players,
+                        myPlayerId = userId ?: "",
+                        onTransactionComplete = { amount, toPlayerId ->
+                            viewModel.makeTransaction(code, playerId, toPlayerId, amount)
+                            navController.popBackStack()
+                        },
+                        onCancel = { navController.popBackStack() },
+                        isBankMode = false,
+                        isHost = userId == hostId,
+                        isMyTurn = userId == currentPlayer
+                    )
+                }
+            } ?: Text("Error: Room or player information not found")
         }
+
         composable("bankTransfer") {
             val players by viewModel.players.collectAsState()
-            val myPlayerId by viewModel.playerId.collectAsState()
+            val currentPlayer by viewModel.currentPlayer.collectAsState()
+            val roomCode by viewModel.roomCode.collectAsState()
+            val hostId by viewModel.hostId.collectAsState()
+            val userId by viewModel.userId.collectAsState()
 
-            myPlayerId?.let { id ->
-                MoneyTransferScreen(
-                    players = players,
-                    myPlayerId = id,
-                    onTransactionComplete = { amount, toPlayerId ->
-                        viewModel.makeBankTransaction(toPlayerId, amount)
-                        navController.popBackStack()
-                    },
-                    onCancel = { navController.popBackStack() },
-                    isBankMode = true
-                )
-            } ?: run {
-                Text("Error: Player ID not found")
-            }
+            currentPlayer?.let { playerId ->
+                roomCode?.let { code ->
+                    MoneyTransferScreen(
+                        players = players,
+                        myPlayerId = userId ?: "",
+                        onTransactionComplete = { amount, toPlayerId ->
+                            viewModel.makeBankTransaction(code, toPlayerId, amount)
+                            navController.popBackStack()
+                        },
+                        onCancel = { navController.popBackStack() },
+                        isBankMode = true,
+                        isHost = userId == hostId,
+                        isMyTurn = userId == currentPlayer
+                    )
+                }
+            } ?: Text("Error: Room or player information not found")
         }
     }
 
-// Observar el estado de autenticación y navegar en consecuencia
+    // Handle navigation based on auth state
     when (authState) {
         is AuthState.Authenticated -> {
-            if (viewModel.getNameState()) {
-                // Navegar a la pantalla principal solo si el nombre no está establecido
+            if (viewModel.isNameSet.collectAsState().value) {
                 if (navController.currentBackStackEntry?.destination?.route != "main") {
                     navController.navigate("main") {
                         popUpTo("auth") { inclusive = true }
                     }
                 }
-            } else {
-                // Si el nombre ya está establecido, podrías navegar a otra pantalla si es necesario
-                // Por ejemplo:
-                // if (navController.currentBackStackEntry?.destination?.route != "home") {
-                //     navController.navigate("home") {
-                //         popUpTo("auth") { inclusive = true }
-                //     }
-                // }
             }
         }
         is AuthState.Unauthenticated -> {
-            // Navegar a la pantalla de autenticación si no está autenticado
             if (navController.currentBackStackEntry?.destination?.route != "auth") {
                 navController.navigate("auth") {
                     popUpTo(navController.graph.startDestinationId) { inclusive = true }
                 }
             }
         }
-        else -> {
-            // Manejar otros estados si es necesario
-        }
+        else -> { /* Handle other states */ }
     }
 }

@@ -43,6 +43,7 @@ class MonopolyViewModel(application: Application) : AndroidViewModel(application
     private var savedPassword: String? = null
     private var savedId: String? = null
     private var savedName: String? = null
+    private var savedProfileImageResId: Int? = null
 
     // Firebase references and listeners
     private val database: FirebaseDatabase = Firebase.database
@@ -59,6 +60,9 @@ class MonopolyViewModel(application: Application) : AndroidViewModel(application
 
     private val _playerName = MutableStateFlow<String?>(null)
     val playerName: StateFlow<String?> get() = _playerName
+
+    private val _profileImageResId = MutableStateFlow(0) // Inicializa con un valor predeterminado válido
+    val profileImageResId: StateFlow<Int> get() = _profileImageResId
 
     private val _players = MutableStateFlow<List<Player>>(emptyList())
     val players: StateFlow<List<Player>> = _players
@@ -87,11 +91,14 @@ class MonopolyViewModel(application: Application) : AndroidViewModel(application
     private val _isNameSet = MutableStateFlow(false)
     val isNameSet: StateFlow<Boolean> = _isNameSet
 
+    private val _isProfileImageSet = MutableStateFlow(false)
+    val isProfileImageSet: StateFlow<Boolean> = _isProfileImageSet
+
     fun setName(name: String) {
         val editor = sharedPreferences.edit()
 
         _playerName.value = name
-        editor.putString("name", name)
+        editor.putString("names", name)
         editor.apply()
         _isNameSet.value = true
         savedName = name
@@ -99,6 +106,21 @@ class MonopolyViewModel(application: Application) : AndroidViewModel(application
 
     fun getNameState(): Boolean {
         return _isNameSet.value
+    }
+
+    fun setProfileImageResId(profileImageResId: Int) {
+        val editor = sharedPreferences.edit()
+
+        _profileImageResId.value = profileImageResId
+        editor.putInt("profileImageResId", profileImageResId)
+        editor.apply()
+        _isProfileImageSet.value = true
+        savedProfileImageResId = profileImageResId
+
+    }
+
+    fun getProfileImageResId(): Int? {
+        return _profileImageResId.value
     }
 
     private var transactionIdCounter = 0
@@ -112,7 +134,7 @@ class MonopolyViewModel(application: Application) : AndroidViewModel(application
         loadUserCredentials()
 
         // Verificar si hay un nombre guardado y actualizar _isNameSet
-        savedName = sharedPreferences.getString("name", null)
+        savedName = sharedPreferences.getString("names", null)
         if (savedName != null) {
             _playerName.value = savedName
             _isNameSet.value = true
@@ -190,7 +212,8 @@ class MonopolyViewModel(application: Application) : AndroidViewModel(application
         savedEmail = sharedPreferences.getString("email", null)
         savedPassword = sharedPreferences.getString("password", null)
         savedId = sharedPreferences.getString("id", null)
-        savedName = sharedPreferences.getString("name", null)
+        savedName = sharedPreferences.getString("names", null)
+        savedProfileImageResId = sharedPreferences.getInt("profileImageResId", 0)
     }
 
     fun loginUser(email: String, password: String) {
@@ -246,7 +269,8 @@ class MonopolyViewModel(application: Application) : AndroidViewModel(application
         editor.putString("email", email)
         editor.putString("password", password)
         editor.putString("id", id)
-        editor.putString("name", savedName)
+        editor.putString("names", savedName)
+        editor.putInt("profileImageResId", savedProfileImageResId ?: 0)
         editor.apply()
 
         _hostId.value = id
@@ -347,7 +371,6 @@ class MonopolyViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    // Crear una transacción entre jugadores y actualizar Firebase
     fun makeTransaction(fromPlayerId: String, toPlayerId: String, amount: Int) {
         viewModelScope.launch {
             val updatedPlayers = _players.value.map { player ->
@@ -361,16 +384,15 @@ class MonopolyViewModel(application: Application) : AndroidViewModel(application
 
             val newTransaction = Transaction(
                 id = transactionIdCounter++,
-                fromPlayer = fromPlayerId,
-                toPlayer = toPlayerId,
+                fromPlayerId = fromPlayerId,
+                toPlayerId = toPlayerId,
                 amount = amount
             )
             _transactions.value = _transactions.value + newTransaction
 
             _roomCode.value?.let { roomCode ->
                 val gameState = GameState(
-                    hostId = _players.value.firstOrNull()?.id
-                        ?: "",  // El host es el primer jugador
+                    hostId = _players.value.firstOrNull()?.id ?: "",
                     players = _players.value,
                     status = if (_gameStarted.value) "started" else "waiting",
                     currentPlayer = _currentPlayer.value ?: "",
@@ -384,7 +406,6 @@ class MonopolyViewModel(application: Application) : AndroidViewModel(application
 
     fun makeBankTransaction(toPlayerId: String, amount: Int) {
         viewModelScope.launch {
-            // Update the player's balance
             val updatedPlayers = _players.value.map { player ->
                 if (player.id == toPlayerId) {
                     player.copy(balance = player.balance + amount)
@@ -394,16 +415,14 @@ class MonopolyViewModel(application: Application) : AndroidViewModel(application
             }
             _players.value = updatedPlayers
 
-            // Create a new transaction
             val newTransaction = Transaction(
                 id = transactionIdCounter++,
-                fromPlayer = "-1", // Use "-1" to represent the bank
-                toPlayer = toPlayerId,
+                fromPlayerId = "-1", // Use "-1" to represent the bank
+                toPlayerId = toPlayerId,
                 amount = amount
             )
             _transactions.value = _transactions.value + newTransaction
 
-            // Update Firebase with the new game state
             _roomCode.value?.let { roomCode ->
                 val gameState = GameState(
                     hostId = _players.value.firstOrNull()?.id ?: "",
@@ -446,7 +465,7 @@ class MonopolyViewModel(application: Application) : AndroidViewModel(application
 
     fun createRoom() {
         val id = playerId
-        val player = Player(id = id.value, name = playerName.value, balance = 1500)
+        val player = Player(id = id.value, name = playerName.value, balance = 1500, profileImageResId = profileImageResId.value)
 
         _isLoading.value = true
         viewModelScope.launch {
@@ -474,7 +493,7 @@ class MonopolyViewModel(application: Application) : AndroidViewModel(application
 
     fun joinRoom(code: String) {
         val id = savedId ?: return
-        val player = Player(id = id, name = playerName.toString(), balance = 1500)
+        val player = Player(id = id, name = playerName.toString(), balance = 1500, profileImageResId = profileImageResId.value)
 
         viewModelScope.launch {
             try {
