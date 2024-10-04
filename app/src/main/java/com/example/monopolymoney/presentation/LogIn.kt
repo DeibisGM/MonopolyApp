@@ -11,6 +11,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.monopolymoney.R
+import com.example.monopolymoney.viewmodel.AuthViewModel
 import com.example.monopolymoney.viewmodel.DataViewModel
 
 @Composable
@@ -27,9 +28,9 @@ fun LoginScreen(
     val isNameSet by viewModel.isNameSet.collectAsState()
 
     LaunchedEffect(authState, isNameSet) {
-        if (authState is AuthState.Authenticated && !isNameSet) {
+        if (authState is AuthViewModel.AuthState.Authenticated && !isNameSet) {
             showNameDialog = true
-        } else if (authState is AuthState.Authenticated && isNameSet) {
+        } else if (authState is AuthViewModel.AuthState.Authenticated && isNameSet) {
             onLoginSuccess()
         }
     }
@@ -95,9 +96,9 @@ fun LoginScreen(
             Text(text = "Sign Up")
         }
 
-        if (authState is AuthState.Error) {
+        if (authState is AuthViewModel.AuthState.Error) {
             Text(
-                text = (authState as AuthState.Error).message,
+                text = (authState as AuthViewModel.AuthState.Error).message,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(top = 16.dp)
             )

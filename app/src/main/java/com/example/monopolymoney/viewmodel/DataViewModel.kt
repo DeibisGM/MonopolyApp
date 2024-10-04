@@ -1,7 +1,5 @@
 package com.example.monopolymoney.viewmodel
 
-import AuthState
-
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -16,7 +14,7 @@ class DataViewModel private constructor(application: Application) : AndroidViewM
     private val transactionViewModel: TransactionViewModel = TransactionViewModel(application)
 
     // Auth State
-    val authState: StateFlow<AuthState> = authViewModel.authState
+    val authState: StateFlow<AuthViewModel.AuthState> = authViewModel.authState
 
     // User ID
     val userId: StateFlow<String?> = authViewModel.userId

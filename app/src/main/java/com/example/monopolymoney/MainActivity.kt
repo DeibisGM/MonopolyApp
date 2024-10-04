@@ -22,6 +22,7 @@ import com.example.monopolymoney.presentation.LobbyScreen
 import com.example.monopolymoney.presentation.MoneyTransferScreen
 import com.example.monopolymoney.ui.theme.Shapes
 import com.example.monopolymoney.ui.theme.Typographys
+import com.example.monopolymoney.viewmodel.AuthViewModel
 import com.example.monopolymoney.viewmodel.DataViewModel
 import com.google.firebase.Firebase
 import com.google.firebase.analytics.analytics
@@ -134,7 +135,7 @@ fun MonopolyApp(navController: NavHostController, viewModel: DataViewModel) {
 
     // Handle navigation based on auth state
     when (authState) {
-        is AuthState.Authenticated -> {
+        is AuthViewModel.AuthState.Authenticated -> {
             if (viewModel.isNameSet.collectAsState().value) {
                 if (navController.currentBackStackEntry?.destination?.route != "main") {
                     navController.navigate("main") {
@@ -143,7 +144,7 @@ fun MonopolyApp(navController: NavHostController, viewModel: DataViewModel) {
                 }
             }
         }
-        is AuthState.Unauthenticated -> {
+        is AuthViewModel.AuthState.Unauthenticated -> {
             if (navController.currentBackStackEntry?.destination?.route != "auth") {
                 navController.navigate("auth") {
                     popUpTo(navController.graph.startDestinationId) { inclusive = true }

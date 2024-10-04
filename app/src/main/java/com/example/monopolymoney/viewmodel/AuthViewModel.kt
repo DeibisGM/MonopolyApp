@@ -1,6 +1,5 @@
 package com.example.monopolymoney.viewmodel
 
-import AuthState
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
@@ -8,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -133,5 +133,12 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         clearUserCredentials()
         _userId.value = null // Limpiar el ID al cerrar sesión
         _authState.value = AuthState.Unauthenticated
+    }
+
+    sealed class AuthState {
+        object Unauthenticated : AuthState()
+        object Loading : AuthState()
+        data class Authenticated(val user: FirebaseUser) : AuthState()
+        data class Error(val message: String) : AuthState()
     }
 }
