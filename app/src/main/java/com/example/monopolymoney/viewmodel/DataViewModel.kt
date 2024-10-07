@@ -3,7 +3,6 @@ package com.example.monopolymoney.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import kotlinx.coroutines.flow.StateFlow
 

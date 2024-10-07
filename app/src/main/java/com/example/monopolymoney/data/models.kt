@@ -1,17 +1,13 @@
 package com.example.monopolymoney.data
 
 import android.os.Parcelable
-import androidx.compose.ui.graphics.Color
-import androidx.room.Entity
-import androidx.room.PrimaryKey
 import kotlinx.parcelize.Parcelize
-
 
 data class Player(
     val id: String? = null,
     val name: String? = null,
     val balance: Int = 0,
-    val profileImageResId: Int = 0 // Nuevo campo para el ID del recurso de la imagen de perfil
+    val profileImageResId: Int = 0
 ) {
     fun toMap(): Map<String, Any?> {
         return mapOf(

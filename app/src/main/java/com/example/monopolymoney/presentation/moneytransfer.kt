@@ -3,8 +3,6 @@ package com.example.monopolymoney.presentation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -213,10 +211,10 @@ fun RecipientSelector(
                 textAlign = TextAlign.Start,
                 fontSize = 18.sp
             )
-            Icon(
-                imageVector = Icons.Filled.ArrowDropDown,
-                contentDescription = "Dropdown Arrow"
-            )
+//            Icon(
+//                imageVector = Icons.Filled.ArrowDropDown,
+//                contentDescription = "Dropdown Arrow"
+//            )
         }
 
         DropdownMenu(
@@ -317,10 +315,10 @@ fun RecipientSelector(selectedRecipient: Player?, players: List<Player>, onRecip
                 textAlign = TextAlign.Start,
                 fontSize = 18.sp
             )
-            Icon(
-                imageVector = Icons.Filled.ArrowDropDown,
-                contentDescription = "Dropdown Arrow"
-            )
+//            Icon(
+//                imageVector = Icons.Filled.ArrowDropDown,
+//                contentDescription = "Dropdown Arrow"
+//            )
         }
 
         DropdownMenu(
