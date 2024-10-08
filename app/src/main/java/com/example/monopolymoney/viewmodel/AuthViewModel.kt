@@ -13,14 +13,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
-    private val _authState = MutableStateFlow<AuthState>(AuthState.Unauthenticated)
-    val authState: StateFlow<AuthState> = _authState
     private val sharedPreferences: SharedPreferences = application.getSharedPreferences("UserCredentials", Context.MODE_PRIVATE)
 
-    // Nuevo StateFlow para el ID del usuario
+    private val _authState = MutableStateFlow<AuthState>(AuthState.Unauthenticated)
+    val authState: StateFlow<AuthState> = _authState
+
     private val _userId = MutableStateFlow<String?>(null)
     val userId: StateFlow<String?> = _userId
 
@@ -34,7 +33,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             val password = sharedPreferences.getString("password", null)
             val storedUserId = sharedPreferences.getString("userId", null)
 
-            // Actualizar el userId StateFlow con el valor almacenado
             _userId.value = storedUserId
 
             if (email != null && password != null) {
@@ -45,7 +43,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     if (user != null) {
                         try {
                             user.reload().await()
-                            _userId.value = user.uid // Actualizar el ID después de recargar el usuario
+                            _userId.value = user.uid
                             _authState.value = AuthState.Authenticated(user)
                         } catch (e: Exception) {
                             handleInvalidCredentials()
@@ -70,17 +68,17 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val user = auth.currentUser
                 if (user != null) {
                     val id = user.uid
-                    _userId.value = id // Actualizar el ID después del login
+                    _userId.value = id
                     _authState.value = AuthState.Authenticated(user)
                     saveUserCredentials(email, password, id)
                 } else {
                     _authState.value = AuthState.Error("Authentication failed")
                 }
             } catch (e: Exception) {
-                if (e is FirebaseAuthInvalidUserException) {
-                    _authState.value = AuthState.Error("User does not exist. Please register.")
+                _authState.value = if (e is FirebaseAuthInvalidUserException) {
+                    AuthState.Error("User does not exist. Please register.")
                 } else {
-                    _authState.value = AuthState.Error(e.message ?: "Authentication failed")
+                    AuthState.Error(e.message ?: "Authentication failed")
                 }
             }
         }
@@ -94,7 +92,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val newUser = auth.currentUser
                 if (newUser != null) {
                     val id = newUser.uid
-                    _userId.value = id // Actualizar el ID después de crear el usuario
+                    _userId.value = id
                     _authState.value = AuthState.Authenticated(newUser)
                     saveUserCredentials(email, password, id)
                 } else {
@@ -110,13 +108,13 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         val editor = sharedPreferences.edit()
         editor.putString("email", email)
         editor.putString("password", password)
-        editor.putString("userId", id) // Guardar el ID en SharedPreferences
+        editor.putString("userId", id)
         editor.apply()
     }
 
     private fun handleInvalidCredentials() {
         clearUserCredentials()
-        _userId.value = null // Limpiar el ID cuando las credenciales son inválidas
+        _userId.value = null
         _authState.value = AuthState.Unauthenticated
     }
 
@@ -124,14 +122,14 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         val editor = sharedPreferences.edit()
         editor.remove("email")
         editor.remove("password")
-        editor.remove("userId") // Eliminar el ID al limpiar las credenciales
+        editor.remove("userId")
         editor.apply()
     }
 
     fun signOut() {
         auth.signOut()
         clearUserCredentials()
-        _userId.value = null // Limpiar el ID al cerrar sesión
+        _userId.value = null
         _authState.value = AuthState.Unauthenticated
     }
 

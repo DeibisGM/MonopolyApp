@@ -32,7 +32,7 @@ private val green = Color(0xFF57D55B)
 
 @Composable
 fun MoneyTransferScreen(
-    players: List<Player>,
+    players: Map<String, Player>, // Cambiado a Map
     myPlayerId: String,
     onTransactionComplete: (amount: Int, toPlayerId: String) -> Unit,
     onCancel: () -> Unit,
@@ -46,19 +46,19 @@ fun MoneyTransferScreen(
     var showErrorDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
 
-    // Find the current player object
-    val currentPlayerObject = players.find { it.id == myPlayerId }
+    // Find the current player object using map
+    val currentPlayerObject = players[myPlayerId]
 
     // Determine if the transaction should be allowed
     val canMakeTransaction = when {
-        isBankMode -> isHost // Host can always use bank
-        else -> isMyTurn // Regular transfers only on your turn
+        isBankMode -> isHost
+        else -> isMyTurn
     }
 
     // Filter recipients based on mode and permissions
     val availableRecipients = when {
-        isBankMode -> players // Bank can transfer to anyone, including self
-        else -> players.filter { it.id != myPlayerId } // Can't transfer to self in normal mode
+        isBankMode -> players.values.toList() // Bank can transfer to anyone, including self
+        else -> players.values.filter { it.id != myPlayerId } // Can't transfer to self in normal mode
     }
 
     MaterialTheme(colorScheme = DarkColorScheme) {
@@ -75,11 +75,7 @@ fun MoneyTransferScreen(
             ) {
                 Column(modifier = Modifier.padding(8.dp)) {
                     Spacer(modifier = Modifier.height(16.dp))
-                    TopBar(
-                        onCancel = onCancel,
-                        isBankMode = isBankMode,
-                        //isEnabled = canMakeTransaction
-                    )
+                    TopBar(onCancel = onCancel, isBankMode = isBankMode)
                     Spacer(modifier = Modifier.height(16.dp))
                     RecipientSelector(
                         selectedRecipient = selectedRecipient,
@@ -134,8 +130,7 @@ fun MoneyTransferScreen(
                                     amount = "0"
                                     isInitialValue = true
                                 }
-                            },
-                            //enabled = canMakeTransaction
+                            }
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         SendButton(
@@ -183,10 +178,11 @@ fun MoneyTransferScreen(
     }
 }
 
+
 @Composable
 fun RecipientSelector(
     selectedRecipient: Player?,
-    players: List<Player>,
+    players: List<Player>, // Sigue siendo lista ya que Dropdown muestra lista
     enabled: Boolean,
     onRecipientSelected: (Player) -> Unit
 ) {
@@ -211,10 +207,6 @@ fun RecipientSelector(
                 textAlign = TextAlign.Start,
                 fontSize = 18.sp
             )
-//            Icon(
-//                imageVector = Icons.Filled.ArrowDropDown,
-//                contentDescription = "Dropdown Arrow"
-//            )
         }
 
         DropdownMenu(

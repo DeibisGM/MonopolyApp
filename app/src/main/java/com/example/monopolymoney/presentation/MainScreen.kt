@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.monopolymoney.R
 import com.example.monopolymoney.data.Player
-import com.example.monopolymoney.data.Transaction
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -33,6 +32,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
+import com.example.monopolymoney.data.GameEvent
+import com.example.monopolymoney.data.GameRoom
 import com.example.monopolymoney.viewmodel.DataViewModel
 
 private val MyYellow = Color(0xFFFFD67E)
@@ -52,6 +53,7 @@ fun LobbyScreen(
     val transactions by viewModel.transactions.collectAsState()
     val userId by viewModel.userId.collectAsState()
     val hostId by viewModel.hostId.collectAsState()
+    val gameStatus by viewModel.gameStatus.collectAsState()
 
     val isHost = userId == hostId
     val isMyTurn = currentPlayer == userId
@@ -59,6 +61,7 @@ fun LobbyScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         when {
             roomCode == null -> MainButtons(viewModel)
+            gameStatus == GameRoom.GameStatus.FINISHED -> GameEndScreen(viewModel)
             !gameStarted -> WaitingRoomScreen(viewModel, players, roomCode, isHost)
             else -> GameScreen(
                 viewModel = viewModel,
@@ -77,13 +80,17 @@ fun MainButtons(viewModel: DataViewModel) {
     var showJoinRoomDialog by remember { mutableStateOf(false) }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(GeneralPadding),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(GeneralPadding),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Button(
             onClick = { showCreateRoomDialog = true },
-            modifier = Modifier.fillMaxWidth().height(ButtonHeight)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(ButtonHeight)
         ) {
             Text("Create Room")
         }
@@ -92,7 +99,9 @@ fun MainButtons(viewModel: DataViewModel) {
 
         Button(
             onClick = { showJoinRoomDialog = true },
-            modifier = Modifier.fillMaxWidth().height(ButtonHeight)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(ButtonHeight)
         ) {
             Text("Join Room")
         }
@@ -173,9 +182,16 @@ fun JoinRoomDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
 }
 
 @Composable
-fun WaitingRoomScreen(viewModel: DataViewModel, players: List<Player>, roomCode: String?, isHost: Boolean) {
+fun WaitingRoomScreen(
+    viewModel: DataViewModel,
+    players: Map<String, Player>, // Now a Map
+    roomCode: String?,
+    isHost: Boolean
+) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(GeneralPadding),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(GeneralPadding),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -193,9 +209,9 @@ fun WaitingRoomScreen(viewModel: DataViewModel, players: List<Player>, roomCode:
 
         Text("Players:", style = MaterialTheme.typography.titleMedium)
         LazyColumn {
-            items(players) { player ->
+            items(players.values.toList()) { player -> // Iterate over values
                 Text(
-                    "${player.name} ${if (isHost) "(Host)" else ""}",
+                    "${player.name} ${if (player.isHost) "(Host)" else ""}", // Access isHost from Player
                     style = MaterialTheme.typography.bodyLarge
                 )
             }
@@ -213,9 +229,13 @@ fun GameScreen(
 ) {
     val context = LocalContext.current
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF141F23))) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(Color(0xFF141F23))) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.padding(GeneralPadding).weight(1f)) {
+            Column(modifier = Modifier
+                .padding(GeneralPadding)
+                .weight(1f)) {
                 TopSection(viewModel)
                 Spacer(modifier = Modifier.height(20.dp))
                 EventLogSection(modifier = Modifier.weight(1f), viewModel = viewModel)
@@ -245,16 +265,57 @@ fun GameScreen(
 fun TopSection(viewModel: DataViewModel) {
     val profileImageResId by viewModel.profileImageResId.collectAsState()
     val myId by viewModel.userId.collectAsState()
-    val players by viewModel.players.collectAsState(initial = emptyList()) // Default to empty list
+    val players by viewModel.players.collectAsState(initial = emptyMap())
+    val roomCode by viewModel.roomCode.collectAsState()
 
-    // Buscar en la lista mi id para extraer el balance
-    val playerBalance: String = players.find { it.id == myId }?.balance?.toString() ?: "0"
+    var showExitDialog by remember { mutableStateOf(false) }
+
+    val playerBalance: String = players[myId]?.balance?.toString() ?: "0"
+    val isHost: Boolean = players[myId]?.isHost ?: false
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth()
     ) {
-        // Imagen de fondo
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(GeneralPadding),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            IconButton(
+                onClick = { showExitDialog = true }
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.end),
+                    contentDescription = "Exit",
+                    tint = Color.Red.copy(alpha = 0.6f)
+                )
+            }
+            Text(
+                text = "Room Code: $roomCode",
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                fontFamily = FontFamily(Font(R.font.carisma500)),
+                fontSize = 16.sp
+            )
+        }
+
+        if (showExitDialog) {
+            ExitGameDialog(
+                isHost = isHost,
+                onDismiss = { showExitDialog = false },
+                onLeaveGame = {
+                    viewModel.leaveGame(isHost)
+                    showExitDialog = false
+                },
+                onEndGame = {
+                    viewModel.endGame()
+                    showExitDialog = false
+                }
+            )
+        }
+
+        // Rest of the TopSection content remains the same
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -273,7 +334,6 @@ fun TopSection(viewModel: DataViewModel) {
 
         Spacer(modifier = Modifier.height(GeneralPadding))
 
-        // Tarjeta de usuario
         UserCard(
             name = viewModel.playerName.value ?: "Player",
             balance = playerBalance,
@@ -281,6 +341,71 @@ fun TopSection(viewModel: DataViewModel) {
         )
     }
 }
+
+@Composable
+fun ExitGameDialog(
+    isHost: Boolean,
+    onDismiss: () -> Unit,
+    onLeaveGame: () -> Unit,
+    onEndGame: () -> Unit
+) {
+    if (isHost) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Exit Options") },
+            text = { Text("Do you want to leave the game or end it for everyone?") },
+            confirmButton = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onLeaveGame,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Red.copy(alpha = 0.8f)
+                        )
+                    ) {
+                        Text("Leave Game")
+                    }
+                    Button(
+                        onClick = onEndGame,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Red
+                        )
+                    ) {
+                        Text("End Game for All")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+            }
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Leave Game") },
+            text = { Text("Are you sure you want to leave the game?") },
+            confirmButton = {
+                Button(
+                    onClick = onLeaveGame,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Red
+                    )
+                ) {
+                    Text("Yes, Leave Game")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
 
 @Composable
 fun UserCard(name: String, balance:String, avatarResId: Int) {
@@ -326,19 +451,21 @@ fun UserCard(name: String, balance:String, avatarResId: Int) {
 
 @Composable
 fun EventLogSection(modifier: Modifier = Modifier, viewModel: DataViewModel) {
-    val transactions by viewModel.transactions.collectAsState()
+    val gameEvents by viewModel.transactions.collectAsState()
     val players by viewModel.players.collectAsState()
 
     Column(modifier = modifier.fillMaxWidth()) {
         Divider(color = MyYellow, thickness = 0.5.dp, modifier = Modifier.padding(bottom = 20.dp))
 
-        if (transactions.isEmpty()) {
+        if (gameEvents.isEmpty()) {
             Box(
-                modifier = Modifier.fillMaxWidth().padding(GeneralPadding),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(GeneralPadding),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "No transactions yet",
+                    text = "No events yet",
                     color = Color.Gray,
                     fontSize = 16.sp
                 )
@@ -347,35 +474,40 @@ fun EventLogSection(modifier: Modifier = Modifier, viewModel: DataViewModel) {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
-                reverseLayout = true // Muestra los elementos más recientes primero
+                reverseLayout = true
             ) {
-                items(transactions) { transaction ->
+                items(gameEvents) { event ->
                     Divider(color = Color.Gray.copy(alpha = 0.5f), thickness = 0.5.dp)
                     Spacer(modifier = Modifier.height(10.dp))
-                    TransactionCard(transaction, players)
-
-
+                    when (event) {
+                        is GameEvent.TransactionEvent -> TransactionEventCard(event, players)
+                        is GameEvent.PlayerLeftEvent -> PlayerLeftEventCard(event)
+                        is GameEvent.GameEndedEvent -> {}
+                    }
                 }
             }
         }
     }
 }
 
-
 @Composable
-fun TransactionCard(transaction: Transaction, players: List<Player>) {
-    val fromUser = if (transaction.fromPlayerId == "-1") "Bank" else players.find { it.id == transaction.fromPlayerId }?.name ?: "Unknown"
-    val toUser = if (transaction.toPlayerId == "-1") "Bank" else players.find { it.id == transaction.toPlayerId }?.name ?: "Unknown"
-    val avatarResId = players.find { it.id == transaction.fromPlayerId }?.profileImageResId ?: R.drawable.default_avatar
+fun TransactionEventCard(transaction: GameEvent.TransactionEvent, players: Map<String, Player>) {
+    val fromUser = if (transaction.fromPlayerId == "-1") "Bank" else players[transaction.fromPlayerId]?.name ?: "Unknown"
+    val toUser = if (transaction.toPlayerId == "-1") "Bank" else players[transaction.toPlayerId]?.name ?: "Unknown"
+    val avatarResId = players[transaction.fromPlayerId]?.profileImageResId ?: R.drawable.default_avatar
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(0.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(0.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Image(
             painter = painterResource(id = avatarResId),
             contentDescription = "Avatar",
-            modifier = Modifier.size(44.dp).clip(CircleShape)
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
         )
         Spacer(modifier = Modifier.width(GeneralPadding))
         Column {
@@ -403,6 +535,150 @@ fun TransactionCard(transaction: Transaction, players: List<Player>) {
     }
 }
 
+
+@Composable
+fun GameEndScreen(viewModel: DataViewModel) {
+    val players by viewModel.players.collectAsState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF141F23))
+            .padding(GeneralPadding),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Game Over!",
+            fontSize = 24.sp,
+            fontFamily = FontFamily(Font(R.font.carisma600)),
+            color = MyYellow,
+            modifier = Modifier.padding(vertical = 32.dp)
+        )
+
+        Text(
+            text = "Final Balances",
+            fontSize = 20.sp,
+            fontFamily = FontFamily(Font(R.font.carisma500)),
+            color = Color.White,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            items(players.values.toList()) { player ->
+                PlayerFinalBalanceCard(player)
+            }
+        }
+
+        Button(
+            onClick = { //viewModel.clearGameRoom()
+                 },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp)
+        ) {
+            Text("Return to Main Menu")
+        }
+    }
+}
+
+@Composable
+fun PlayerFinalBalanceCard(player: Player) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF16252B))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Image(
+                painter = painterResource(id = player.profileImageResId),
+                contentDescription = "Player avatar",
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column {
+                Text(
+                    text = player.name ?: "Unknown",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontFamily = FontFamily(Font(R.font.carisma500))
+                )
+                if (player.isHost) {
+                    Text(
+                        text = "Host",
+                        color = MyYellow,
+                        fontSize = 14.sp,
+                        fontFamily = FontFamily(Font(R.font.carisma500))
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Text(
+                text = "$${player.balance}",
+                color = MyYellow,
+                fontSize = 20.sp,
+                fontFamily = FontFamily(Font(R.font.carisma600))
+            )
+        }
+    }
+}
+
+@Composable
+fun PlayerLeftEventCard(event: GameEvent.PlayerLeftEvent) {
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(0.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Image(
+            painter = painterResource(id = event.profileImageResId),
+            contentDescription = "Player Avatar",
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+        )
+        Spacer(modifier = Modifier.width(GeneralPadding))
+        Column {
+            Text(
+                text = "Player Left",
+                fontSize = 16.sp,
+                fontFamily = FontFamily(Font(R.font.carisma600)),
+                color = Color.Red.copy(alpha = 0.7f)
+            )
+
+            Text(
+                text = "${event.playerName} left the game",
+                fontFamily = FontFamily(Font(R.font.carisma500)),
+                color = Color.Gray,
+                fontSize = 16.sp
+            )
+
+            if (event.wasHost && event.newHostId != null) {
+                Text(
+                    text = "New host assigned",
+                    fontFamily = FontFamily(Font(R.font.carisma500)),
+                    color = Color.Gray,
+                    fontSize = 14.sp
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun BottomButtonsSection(
     modifier: Modifier = Modifier,
@@ -414,7 +690,10 @@ fun BottomButtonsSection(
 ) {
     Row(
         modifier = modifier
-            .background(Color(0xFF16252B), shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
+            .background(
+                Color(0xFF16252B),
+                shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)
+            )
             .padding(vertical = 20.dp, horizontal = 20.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -459,4 +738,3 @@ fun BottomButton(
         }
     }
 }
-
