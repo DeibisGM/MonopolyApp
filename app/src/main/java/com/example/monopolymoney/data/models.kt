@@ -47,6 +47,36 @@ data class Player(
     }
 }
 
+data class User(
+    val uuid: String = "",
+    val email: String = "",
+    val name: String = "",
+    val profileImageResId: Int = 0
+) {
+    // Constructor sin argumentos requerido para Firebase
+    constructor() : this("", "", "", 0)
+
+    fun toMap(): Map<String, Any?> {
+        return mapOf(
+            "uuid" to uuid,
+            "email" to email,
+            "name" to name,
+            "profileImageResId" to profileImageResId
+        )
+    }
+
+    companion object {
+        fun fromMap(map: Map<String, Any?>): User {
+            return User(
+                uuid = map["uuid"] as? String ?: "",
+                email = map["email"] as? String ?: "",
+                name = map["name"] as? String ?: "",
+                profileImageResId = (map["profileImageResId"] as? Long)?.toInt() ?: 0
+            )
+        }
+    }
+}
+
 sealed class GameEvent {
     data class TransactionEvent(
         val id: Int = 0,

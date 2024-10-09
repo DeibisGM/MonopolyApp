@@ -1,6 +1,7 @@
 package com.example.monopolymoney
 
-import LoginScreen
+import AuthScreen
+import ProfileSetupScreen
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -10,6 +11,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -24,21 +26,16 @@ import com.example.monopolymoney.ui.theme.Shapes
 import com.example.monopolymoney.ui.theme.Typographys
 import com.example.monopolymoney.viewmodel.AuthViewModel
 import com.example.monopolymoney.viewmodel.DataViewModel
-import com.google.firebase.Firebase
-import com.google.firebase.analytics.analytics
+import com.google.firebase.analytics.FirebaseAnalytics
 
 class MainActivity : ComponentActivity() {
     private lateinit var viewModel: DataViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Firebase.analytics
+        FirebaseAnalytics.getInstance(this)
 
-        // Initialize DataViewModel using its Factory
-        viewModel = ViewModelProvider(
-            this,
-            DataViewModel.Factory(application)
-        )[DataViewModel::class.java]
+        viewModel = ViewModelProvider(this, DataViewModel.Factory(application))[DataViewModel::class.java]
 
         setContent {
             MaterialTheme(
@@ -61,25 +58,63 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MonopolyApp(navController: NavHostController, viewModel: DataViewModel) {
     val authState by viewModel.authState.collectAsState()
+    val user by viewModel.user.collectAsState()
+    val registrationState by viewModel.authViewModel.registrationState.collectAsState()
 
-    NavHost(navController = navController, startDestination = "auth") {
-        composable("auth") {
-            LoginScreen(
-                viewModel = viewModel,
-                onLoginSuccess = {
+    LaunchedEffect(authState, registrationState) {
+        when {
+            authState is AuthViewModel.AuthState.Authenticated && registrationState == AuthViewModel.RegistrationState.NeedsProfile -> {
+                if (navController.currentDestination?.route != "profile_setup") {
+                    navController.navigate("profile_setup") {
+                        popUpTo("auth") { inclusive = true }
+                    }
+                }
+            }
+            authState is AuthViewModel.AuthState.Authenticated && registrationState == AuthViewModel.RegistrationState.Complete -> {
+                if (navController.currentDestination?.route != "main") {
                     navController.navigate("main") {
                         popUpTo("auth") { inclusive = true }
                     }
                 }
-            )
+            }
+            authState is AuthViewModel.AuthState.Unauthenticated -> {
+                if (navController.currentDestination?.route != "auth") {
+                    navController.navigate("auth") {
+                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                    }
+                }
+            }
+        }
+    }
+
+    NavHost(navController = navController, startDestination = "auth") {
+        composable("auth") {
+            AuthScreen(viewModel = viewModel.authViewModel)
+        }
+
+        composable("profile_setup") {
+            ProfileSetupScreen(viewModel = viewModel.authViewModel)
         }
 
         composable("main") {
-            LobbyScreen(
-                viewModel = viewModel,
-                onNavigateToMoneyTransfer = { navController.navigate("moneyTransfer") },
-                onNavigateToBankTransfer = { navController.navigate("bankTransfer") }
-            )
+            val players by viewModel.players.collectAsState()
+            val currentPlayer by viewModel.currentPlayer.collectAsState()
+            val roomCode by viewModel.roomCode.collectAsState()
+            val hostId by viewModel.hostId.collectAsState()
+
+            if (user != null) {
+                LobbyScreen(
+                    viewModel = viewModel,
+                    onNavigateToMoneyTransfer = { navController.navigate("moneyTransfer") },
+                    onNavigateToBankTransfer = { navController.navigate("bankTransfer") }
+                )
+            } else {
+                LaunchedEffect(Unit) {
+                    navController.navigate("auth") {
+                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                    }
+                }
+            }
         }
 
         composable("moneyTransfer") {
@@ -87,24 +122,27 @@ fun MonopolyApp(navController: NavHostController, viewModel: DataViewModel) {
             val currentPlayer by viewModel.currentPlayer.collectAsState()
             val roomCode by viewModel.roomCode.collectAsState()
             val hostId by viewModel.hostId.collectAsState()
-            val userId by viewModel.userId.collectAsState()
+            val userId = user?.uuid
 
-            currentPlayer?.let { playerId ->
-                roomCode?.let { code ->
-                    MoneyTransferScreen(
-                        players = players,
-                        myPlayerId = userId ?: "",
-                        onTransactionComplete = { amount, toPlayerId ->
-                            viewModel.makeTransaction(code, playerId, toPlayerId, amount)
-                            navController.popBackStack()
-                        },
-                        onCancel = { navController.popBackStack() },
-                        isBankMode = false,
-                        isHost = userId == hostId,
-                        isMyTurn = userId == currentPlayer
-                    )
+            if (currentPlayer != null && roomCode != null && userId != null) {
+                MoneyTransferScreen(
+                    players = players,
+                    myPlayerId = userId,
+                    onTransactionComplete = { amount, toPlayerId ->
+                        viewModel.makeTransaction(userId, toPlayerId, amount)
+                        navController.popBackStack()
+                    },
+                    onCancel = { navController.popBackStack() },
+                    isBankMode = false,
+                    isHost = userId == hostId,
+                    isMyTurn = userId == currentPlayer
+                )
+            } else {
+                Text("Error: Room or player information not found")
+                LaunchedEffect(Unit) {
+                    navController.popBackStack()
                 }
-            } ?: Text("Error: Room or player information not found")
+            }
         }
 
         composable("bankTransfer") {
@@ -112,45 +150,27 @@ fun MonopolyApp(navController: NavHostController, viewModel: DataViewModel) {
             val currentPlayer by viewModel.currentPlayer.collectAsState()
             val roomCode by viewModel.roomCode.collectAsState()
             val hostId by viewModel.hostId.collectAsState()
-            val userId by viewModel.userId.collectAsState()
+            val userId = user?.uuid
 
-            currentPlayer?.let { playerId ->
-                roomCode?.let { code ->
-                    MoneyTransferScreen(
-                        players = players,
-                        myPlayerId = userId ?: "",
-                        onTransactionComplete = { amount, toPlayerId ->
-                            viewModel.makeBankTransaction(code, toPlayerId, amount)
-                            navController.popBackStack()
-                        },
-                        onCancel = { navController.popBackStack() },
-                        isBankMode = true,
-                        isHost = userId == hostId,
-                        isMyTurn = userId == currentPlayer
-                    )
-                }
-            } ?: Text("Error: Room or player information not found")
-        }
-    }
-
-    // Handle navigation based on auth state
-    when (authState) {
-        is AuthViewModel.AuthState.Authenticated -> {
-            if (viewModel.isNameSet.collectAsState().value) {
-                if (navController.currentBackStackEntry?.destination?.route != "main") {
-                    navController.navigate("main") {
-                        popUpTo("auth") { inclusive = true }
-                    }
+            if (currentPlayer != null && roomCode != null && userId != null) {
+                MoneyTransferScreen(
+                    players = players,
+                    myPlayerId = userId,
+                    onTransactionComplete = { amount, toPlayerId ->
+                        viewModel.makeBankTransaction(toPlayerId, amount)
+                        navController.popBackStack()
+                    },
+                    onCancel = { navController.popBackStack() },
+                    isBankMode = true,
+                    isHost = userId == hostId,
+                    isMyTurn = userId == currentPlayer
+                )
+            } else {
+                Text("Error: Room or player information not found")
+                LaunchedEffect(Unit) {
+                    navController.popBackStack()
                 }
             }
         }
-        is AuthViewModel.AuthState.Unauthenticated -> {
-            if (navController.currentBackStackEntry?.destination?.route != "auth") {
-                navController.navigate("auth") {
-                    popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                }
-            }
-        }
-        else -> { /* Handle other states */ }
     }
 }

@@ -51,7 +51,8 @@ fun LobbyScreen(
     val players by viewModel.players.collectAsState()
     val currentPlayer by viewModel.currentPlayer.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
-    val userId by viewModel.userId.collectAsState()
+    val user by viewModel.user.collectAsState()
+    val userId = user?.uuid
     val hostId by viewModel.hostId.collectAsState()
     val gameStatus by viewModel.gameStatus.collectAsState()
 
@@ -111,7 +112,7 @@ fun MainButtons(viewModel: DataViewModel) {
         CreateRoomDialog(
             onDismiss = { showCreateRoomDialog = false },
             onConfirm = {
-                viewModel.createRoom(viewModel.playerName.value ?: "", viewModel.profileImageResId.value)
+                viewModel.createRoom()
                 showCreateRoomDialog = false
             }
         )
@@ -121,7 +122,7 @@ fun MainButtons(viewModel: DataViewModel) {
         JoinRoomDialog(
             onDismiss = { showJoinRoomDialog = false },
             onConfirm = { code ->
-                viewModel.joinRoom(code, viewModel.playerName.value ?: "", viewModel.profileImageResId.value)
+                viewModel.joinRoom(code)
                 showJoinRoomDialog = false
             }
         )
@@ -263,8 +264,10 @@ fun GameScreen(
 
 @Composable
 fun TopSection(viewModel: DataViewModel) {
-    val profileImageResId by viewModel.profileImageResId.collectAsState()
-    val myId by viewModel.userId.collectAsState()
+    val user by viewModel.user.collectAsState()
+    val myId = user?.uuid
+    val profileImageResId = user?.profileImageResId
+    val name = user?.name
     val players by viewModel.players.collectAsState(initial = emptyMap())
     val roomCode by viewModel.roomCode.collectAsState()
 
@@ -305,7 +308,7 @@ fun TopSection(viewModel: DataViewModel) {
                 isHost = isHost,
                 onDismiss = { showExitDialog = false },
                 onLeaveGame = {
-                    viewModel.leaveGame(isHost)
+                    viewModel.leaveGame()
                     showExitDialog = false
                 },
                 onEndGame = {
@@ -334,11 +337,13 @@ fun TopSection(viewModel: DataViewModel) {
 
         Spacer(modifier = Modifier.height(GeneralPadding))
 
-        UserCard(
-            name = viewModel.playerName.value ?: "Player",
-            balance = playerBalance,
-            avatarResId = profileImageResId
-        )
+        if (profileImageResId != null) {
+            UserCard(
+                name = name?: "Player",
+                balance = playerBalance,
+                avatarResId = profileImageResId
+            )
+        }
     }
 }
 

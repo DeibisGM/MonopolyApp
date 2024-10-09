@@ -9,17 +9,20 @@ import com.example.monopolymoney.data.GameEvent
 import com.example.monopolymoney.data.GameRoom
 import com.example.monopolymoney.data.GameRoomRepository
 import com.example.monopolymoney.data.Player
+import com.example.monopolymoney.data.User
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class DataViewModel private constructor(application: Application) : AndroidViewModel(application) {
-    private val authViewModel: AuthViewModel = AuthViewModel(application)
-    private val playerViewModel: PlayerViewModel = PlayerViewModel(application)
+    val authViewModel: AuthViewModel = AuthViewModel(application)
     private val gameRoomRepository = GameRoomRepository()
+    private val database: DatabaseReference = FirebaseDatabase.getInstance().reference
 
     // Auth State
     val authState: StateFlow<AuthViewModel.AuthState> = authViewModel.authState
-    val userId: StateFlow<String?> = authViewModel.userId
+    val user: StateFlow<User?> = authViewModel.user
 
     // GameRoom State
     private val _gameRoom = MutableStateFlow<GameRoom?>(null)
@@ -48,15 +51,9 @@ class DataViewModel private constructor(application: Application) : AndroidViewM
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     // ==========================
-    // Player Methods
+    // User Methods
     // ==========================
-    val playerName = playerViewModel.playerName
-    val profileImageResId = playerViewModel.profileImageResId
-    val isNameSet = playerViewModel.isNameSet
-    val isProfileImageSet = playerViewModel.isProfileImageSet
-
-    fun setName(name: String) = playerViewModel.setName(name)
-    fun setProfileImageResId(profileImageResId: Int) = playerViewModel.setProfileImageResId(profileImageResId)
+    fun updateUserProfile(name: String, profileImageResId: Int) = authViewModel.updateUserProfile(name, profileImageResId)
 
     // ==========================
     // Auth Methods
@@ -68,28 +65,28 @@ class DataViewModel private constructor(application: Application) : AndroidViewM
     // ==========================
     // Room Management Methods
     // ==========================
-    fun createRoom(playerName: String, profileImageResId: Int) {
+    fun createRoom() {
         viewModelScope.launch {
-            userId.value?.let { id ->
-                val player = Player(id, playerName, 1500, profileImageResId, true)
-                val newGameRoom = gameRoomRepository.createGameRoom(id, player)
+            user.value?.let { currentUser ->
+                val player = Player(currentUser.uuid, currentUser.name, 1500, currentUser.profileImageResId, true)
+                val newGameRoom = gameRoomRepository.createGameRoom(currentUser.uuid, player)
                 _gameRoom.value = newGameRoom
                 observeGameRoom(newGameRoom.roomCode)
             }
         }
     }
 
-    fun joinRoom(code: String, playerName: String, profileImageResId: Int) {
+    fun joinRoom(code: String) {
         viewModelScope.launch {
             try {
-                userId.value?.let { id ->
+                user.value?.let { currentUser ->
                     val roomSnapshot = gameRoomRepository.getRoomSnapshot(code)
                     if (roomSnapshot != null) {
                         val currentRoom = GameRoom.fromMap(roomSnapshot)
                         if (currentRoom != null) {
-                            val player = Player(id, playerName, 1500, profileImageResId, false)
+                            val player = Player(currentUser.uuid, currentUser.name, 1500, currentUser.profileImageResId, false)
                             val updatedRoom = currentRoom.copy(
-                                players = currentRoom.players + (id to player)
+                                players = currentRoom.players + (currentUser.uuid to player)
                             )
                             gameRoomRepository.updateGameRoom(updatedRoom)
                             observeGameRoom(code)
@@ -132,13 +129,13 @@ class DataViewModel private constructor(application: Application) : AndroidViewM
         }
     }
 
-    fun leaveGame(isHost: Boolean = false) {
+    fun leaveGame() {
         viewModelScope.launch {
             _gameRoom.value?.let { currentRoom ->
-                userId.value?.let { currentUserId ->
-                    val currentPlayer = currentRoom.players[currentUserId]
+                user.value?.let { currentUser ->
+                    val currentPlayer = currentRoom.players[currentUser.uuid]
                     if (currentPlayer != null) {
-                        val updatedPlayers = currentRoom.players - currentUserId
+                        val updatedPlayers = currentRoom.players - currentUser.uuid
 
                         // Si no quedan más jugadores, termina el juego
                         if (updatedPlayers.isEmpty()) {
@@ -148,14 +145,14 @@ class DataViewModel private constructor(application: Application) : AndroidViewM
 
                         // Si el jugador que sale era el actual, pasar al siguiente
                         var nextPlayerId = currentRoom.currentPlayerId
-                        if (currentUserId == currentRoom.currentPlayerId) {
+                        if (currentUser.uuid == currentRoom.currentPlayerId) {
                             val playerIds = updatedPlayers.keys.toList()
-                            val currentIndex = playerIds.indexOf(currentUserId)
+                            val currentIndex = playerIds.indexOf(currentUser.uuid)
                             nextPlayerId = playerIds.getOrNull((currentIndex + 1) % playerIds.size)
                         }
 
                         // Si el host está saliendo, transferir el rol al siguiente jugador
-                        val newHostId = if (isHost && updatedPlayers.isNotEmpty()) {
+                        val newHostId = if (currentPlayer.isHost && updatedPlayers.isNotEmpty()) {
                             updatedPlayers.keys.first()
                         } else null
 
@@ -170,10 +167,10 @@ class DataViewModel private constructor(application: Application) : AndroidViewM
                         // Crear evento de salida del jugador
                         val playerLeftEvent = GameEvent.PlayerLeftEvent(
                             id = currentRoom.gameEvents.size,
-                            playerId = currentUserId,
+                            playerId = currentUser.uuid,
                             playerName = currentPlayer.name ?: "Unknown",
                             profileImageResId = currentPlayer.profileImageResId,
-                            wasHost = isHost,
+                            wasHost = currentPlayer.isHost,
                             newHostId = newHostId
                         )
 
@@ -209,11 +206,10 @@ class DataViewModel private constructor(application: Application) : AndroidViewM
         }
     }
 
-
     // ==========================
     // Transaction Methods
     // ==========================
-    fun makeTransaction(roomCode: String, fromPlayerId: String, toPlayerId: String, amount: Int) {
+    fun makeTransaction(fromPlayerId: String, toPlayerId: String, amount: Int) {
         viewModelScope.launch {
             _gameRoom.value?.let { currentRoom ->
                 val updatedPlayers = currentRoom.players.mapValues { (playerId, player) ->
@@ -241,7 +237,7 @@ class DataViewModel private constructor(application: Application) : AndroidViewM
         }
     }
 
-    fun makeBankTransaction(roomCode: String, toPlayerId: String, amount: Int) {
+    fun makeBankTransaction(toPlayerId: String, amount: Int) {
         viewModelScope.launch {
             _gameRoom.value?.let { currentRoom ->
                 val updatedPlayers = currentRoom.players.mapValues { (playerId, player) ->
