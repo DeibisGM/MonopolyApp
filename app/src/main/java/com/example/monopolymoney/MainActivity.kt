@@ -22,6 +22,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.monopolymoney.presentation.LobbyScreen
 import com.example.monopolymoney.presentation.MoneyTransferScreen
+import com.example.monopolymoney.presentation.SettingsScreen
 import com.example.monopolymoney.ui.theme.Shapes
 import com.example.monopolymoney.ui.theme.Typographys
 import com.example.monopolymoney.viewmodel.AuthViewModel
@@ -106,7 +107,8 @@ fun MonopolyApp(navController: NavHostController, viewModel: DataViewModel) {
                 LobbyScreen(
                     viewModel = viewModel,
                     onNavigateToMoneyTransfer = { navController.navigate("moneyTransfer") },
-                    onNavigateToBankTransfer = { navController.navigate("bankTransfer") }
+                    onNavigateToBankTransfer = { navController.navigate("bankTransfer") },
+                    onNavigateToSettings = { navController.navigate("settings") }
                 )
             } else {
                 LaunchedEffect(Unit) {
@@ -143,6 +145,13 @@ fun MonopolyApp(navController: NavHostController, viewModel: DataViewModel) {
                     navController.popBackStack()
                 }
             }
+        }
+
+        composable("settings") {
+            SettingsScreen(
+                viewModel = viewModel.authViewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
 
         composable("bankTransfer") {

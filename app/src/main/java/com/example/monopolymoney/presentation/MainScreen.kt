@@ -44,7 +44,8 @@ private val ButtonHeight = 55.dp
 fun LobbyScreen(
     viewModel: DataViewModel,
     onNavigateToMoneyTransfer: () -> Unit,
-    onNavigateToBankTransfer: () -> Unit
+    onNavigateToBankTransfer: () -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
     val roomCode by viewModel.roomCode.collectAsState()
     val gameStarted by viewModel.gameStarted.collectAsState()
@@ -60,6 +61,16 @@ fun LobbyScreen(
     val isMyTurn = currentPlayer == userId
 
     Box(modifier = Modifier.fillMaxSize()) {
+
+        IconButton(
+            onClick = { onNavigateToSettings() },
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.end),
+                contentDescription = "Settings"
+            )
+        }
+
         when {
             roomCode == null -> MainButtons(viewModel)
             gameStatus == GameRoom.GameStatus.FINISHED -> GameEndScreen(viewModel)

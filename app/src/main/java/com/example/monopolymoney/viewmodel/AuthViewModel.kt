@@ -6,8 +6,11 @@ import android.content.SharedPreferences
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.monopolymoney.data.User
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
@@ -87,6 +90,54 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             handleInvalidCredentials()
         } catch (e: Exception) {
             handleInvalidCredentials()
+        }
+    }
+
+    fun changePassword(currentPassword: String, newPassword: String) {
+        viewModelScope.launch {
+            try {
+                val user = auth.currentUser
+                if (user != null && user.email != null) {
+                    // Re-authenticate user before changing password
+                    val credential = EmailAuthProvider.getCredential(user.email!!, currentPassword)
+                    user.reauthenticate(credential).await()
+
+                    // Change password
+                    user.updatePassword(newPassword).await()
+                    _authState.value = AuthState.Authenticated(user)
+                }
+            } catch (e: Exception) {
+                when (e) {
+                    is FirebaseAuthWeakPasswordException ->
+                        _authState.value = AuthState.Error("Password should be at least 6 characters")
+                    is FirebaseAuthInvalidCredentialsException ->
+                        _authState.value = AuthState.Error("Current password is incorrect")
+                    else -> _authState.value = AuthState.Error(e.message ?: "Failed to change password")
+                }
+            }
+        }
+    }
+
+    fun deleteAccount() {
+        viewModelScope.launch {
+            try {
+                val user = auth.currentUser
+                if (user != null) {
+                    // Delete user data from database
+                    database.child(user.uid).removeValue().await()
+
+                    // Delete Firebase Auth account
+                    user.delete().await()
+
+                    // Clear local data
+                    clearUserCredentials()
+                    _user.value = null
+                    _registrationState.value = RegistrationState.None
+                    _authState.value = AuthState.Unauthenticated
+                }
+            } catch (e: Exception) {
+                _authState.value = AuthState.Error(e.message ?: "Failed to delete account")
+            }
         }
     }
 
@@ -171,19 +222,37 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateUserProfile(name: String, profileImageResId: Int) {
         viewModelScope.launch {
-            _user.value?.let { currentUser ->
-                val updatedUser = currentUser.copy(
-                    name = name,
-                    profileImageResId = profileImageResId
-                )
-                try {
-                    updateUserInDatabase(updatedUser)
+            try {
+                _user.value?.let { currentUser ->
+                    val updatedUser = currentUser.copy(
+                        name = name,
+                        profileImageResId = profileImageResId
+                    )
+
+                    // Update in database
+                    database.child(updatedUser.uuid).updateChildren(updatedUser.toMap()).await()
+
+                    // Update local state
                     _user.value = updatedUser
-                    // Indicar que el registro está completo
-                    _registrationState.value = RegistrationState.Complete
-                } catch (e: Exception) {
-                    _authState.value = AuthState.Error("Failed to update profile")
+
+                    // Update registration state if needed
+                    if (name.isNotBlank() && profileImageResId != 0) {
+                        _registrationState.value = RegistrationState.Complete
+                    }
                 }
+            } catch (e: Exception) {
+                _authState.value = AuthState.Error("Failed to update profile")
+            }
+        }
+    }
+
+    fun sendPasswordResetEmail(email: String) {
+        viewModelScope.launch {
+            try {
+                auth.sendPasswordResetEmail(email).await()
+                _authState.value = AuthState.ResetEmailSent
+            } catch (e: Exception) {
+                _authState.value = AuthState.Error(e.message ?: "Failed to send reset email")
             }
         }
     }
@@ -225,5 +294,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         object Loading : AuthState()
         data class Authenticated(val firebaseUser: FirebaseUser) : AuthState()
         data class Error(val message: String) : AuthState()
+        object ResetEmailSent : AuthState()
     }
 }
