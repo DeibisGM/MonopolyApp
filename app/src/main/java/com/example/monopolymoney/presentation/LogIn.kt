@@ -33,8 +33,10 @@ fun AuthScreen(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var showForgotPasswordDialog by remember { mutableStateOf(false) }
+    var feedbackMessage by remember { mutableStateOf<String?>(null) }
 
     val authState by viewModel.authState.collectAsState()
+    val registrationState by viewModel.registrationState.collectAsState()
 
     Column(
         modifier = Modifier
@@ -42,135 +44,207 @@ fun AuthScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = "Login to Monopoly Money",
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 24.dp)
-        )
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Email),
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            trailingIcon = {
-                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.end),
-                        contentDescription = "Toggle Password Visibility"
-                    )
-                }
-            },
-            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        TextButton(
-            onClick = { showForgotPasswordDialog = true },
-            modifier = Modifier.align(Alignment.End)
-        ) {
-            Text("Forgot Password?")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = { viewModel.loginUser(email, password) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-        ) {
-            Text(text = "Log In")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = { viewModel.createUser(email, password) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-        ) {
-            Text(text = "Sign Up")
-        }
-
-        if (authState is AuthViewModel.AuthState.Error) {
-            Text(
-                text = (authState as AuthViewModel.AuthState.Error).message,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(top = 16.dp)
-            )
-        } else if (authState is AuthViewModel.AuthState.ResetEmailSent) {
-            Text(
-                text = "Password reset email sent!",
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 16.dp)
-            )
-        }
-    }
-
-    if (showForgotPasswordDialog) {
-        var resetEmail by remember { mutableStateOf(email) }
-
-        AlertDialog(
-            onDismissRequest = { showForgotPasswordDialog = false },
-            title = {
-                Text("Reset Password", style = MaterialTheme.typography.headlineSmall)
-            },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        "Enter your email to receive a password reset link.",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = resetEmail,
-                        onValueChange = { resetEmail = it },
-                        label = { Text("Email") },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Email)
-                    )
-                }
-            },
-            confirmButton = {
+        when (registrationState) {
+            is AuthViewModel.RegistrationState.EmailVerificationSent -> {
+                Text(
+                    text = "Please verify your email",
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                Text(
+                    text = "We've sent a verification email to $email. Please check your inbox and click the verification link.",
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
                 Button(
                     onClick = {
-                        if (resetEmail.isNotEmpty()) {
-                            viewModel.sendPasswordResetEmail(resetEmail)
-                            showForgotPasswordDialog = false
-                        }
+                        viewModel.verifyEmail()
+                        feedbackMessage = "Checking email verification status..."
+//                        if (authState is AuthViewModel.AuthState.Error) {
+//                            feedbackMessage = "Checking email verification status..." + (authState as AuthViewModel.AuthState.Error).message
+//                        }
                     },
-                    modifier = Modifier.padding(8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
                 ) {
-                    Text("Send Link")
+                    Text("I've verified my email")
                 }
-            },
-            dismissButton = {
                 TextButton(
-                    onClick = { showForgotPasswordDialog = false },
-                    modifier = Modifier.padding(8.dp)
+                    onClick = {
+                        viewModel.resendVerificationEmail()
+                        feedbackMessage = "Verification email resent. Please check your inbox."
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Cancel")
+                    Text("Resend verification email")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        feedbackMessage = null
+                        viewModel.signOut() // This will trigger a state change to Unauthenticated
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Back to Login")
+                }
+
+                feedbackMessage?.let {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
                 }
             }
-        )
+            else -> {
+                Text(
+                    text = "Login to Monopoly Money",
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.padding(bottom = 24.dp)
+                )
+
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Email") },
+                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Email),
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = email.isEmpty()  // Marca como error si el email está vacío
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Password),
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = password.isEmpty()  // Marca como error si la contraseña está vacía
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TextButton(
+                    onClick = { showForgotPasswordDialog = true },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("Forgot Password?")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = {
+                        if (email.isNotBlank() && password.isNotBlank()) {
+                            viewModel.loginUser(email, password)
+                        } else {
+                            feedbackMessage = "Please enter both email and password."
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Text(text = "Log In")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = {
+                        if (email.isNotBlank() && password.isNotBlank()) {
+                            viewModel.createUser(email, password)
+                        } else {
+                            feedbackMessage = "Please enter both email and password."
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Text(text = "Sign Up")
+                }
+
+                if (authState is AuthViewModel.AuthState.Error) {
+                    Text(
+                        text = (authState as AuthViewModel.AuthState.Error).message,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+                } else if (authState is AuthViewModel.AuthState.ResetEmailSent) {
+                    Text(
+                        text = "Password reset email sent!",
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+                }
+
+                feedbackMessage?.let {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+                }
+            }
+        }
+
+        if (showForgotPasswordDialog) {
+            var resetEmail by remember { mutableStateOf(email) }
+
+            AlertDialog(
+                onDismissRequest = { showForgotPasswordDialog = false },
+                title = {
+                    Text("Reset Password", style = MaterialTheme.typography.headlineSmall)
+                },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            "Enter your email to receive a password reset link.",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = resetEmail,
+                            onValueChange = { resetEmail = it },
+                            label = { Text("Email") },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Email)
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (resetEmail.isNotEmpty()) {
+                                viewModel.sendPasswordResetEmail(resetEmail)
+                                showForgotPasswordDialog = false
+                            }
+                        },
+                        modifier = Modifier.padding(8.dp)
+                    ) {
+                        Text("Send Link")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showForgotPasswordDialog = false },
+                        modifier = Modifier.padding(8.dp)
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -223,7 +297,7 @@ fun ProfileSetupScreen(
         )
 
         LazyVerticalGrid(
-            columns = GridCells.Fixed(5),  // Ajusta el número de columnas
+            columns = GridCells.Fixed(5),
             contentPadding = PaddingValues(0.dp),
             modifier = Modifier.fillMaxWidth()
                 .heightIn(max = 300.dp)
@@ -248,8 +322,6 @@ fun ProfileSetupScreen(
                 )
             }
         }
-
-
 
         Spacer(modifier = Modifier.height(24.dp))
 

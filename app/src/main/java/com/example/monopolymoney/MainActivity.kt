@@ -78,7 +78,7 @@ fun MonopolyApp(navController: NavHostController, viewModel: DataViewModel) {
                     }
                 }
             }
-            authState is AuthViewModel.AuthState.Unauthenticated -> {
+            authState is AuthViewModel.AuthState.Unauthenticated && registrationState != AuthViewModel.RegistrationState.EmailVerificationSent -> {
                 if (navController.currentDestination?.route != "auth") {
                     navController.navigate("auth") {
                         popUpTo(navController.graph.startDestinationId) { inclusive = true }
@@ -87,6 +87,7 @@ fun MonopolyApp(navController: NavHostController, viewModel: DataViewModel) {
             }
         }
     }
+
 
     NavHost(navController = navController, startDestination = "auth") {
         composable("auth") {

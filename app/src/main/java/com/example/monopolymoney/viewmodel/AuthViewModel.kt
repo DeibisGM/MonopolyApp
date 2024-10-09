@@ -21,12 +21,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
-    // Agregar nuevo estado para el registro
     sealed class RegistrationState {
         object None : RegistrationState()
+        object EmailVerificationSent : RegistrationState()
+        object EmailVerified : RegistrationState()
         object NeedsProfile : RegistrationState()
         object Complete : RegistrationState()
     }
+
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     private val database: DatabaseReference = FirebaseDatabase.getInstance().reference.child("users")
     private val sharedPreferences: SharedPreferences = application.getSharedPreferences("UserCredentials", Context.MODE_PRIVATE)
@@ -49,28 +51,25 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             val storedUuid = sharedPreferences.getString("uuid", null)
+            val isEmailVerified = sharedPreferences.getBoolean("isEmailVerified", false)
 
             if (storedUuid != null) {
                 try {
                     val user = getUserFromDatabase(storedUuid)
-                    if (user != null) {
-                        // Si encontramos al usuario en la base de datos
+                    if (user != null && (isEmailVerified || auth.currentUser?.isEmailVerified == true)) {
                         _user.value = user
 
-                        // Verificar si el usuario necesita completar su perfil
-                        if (user.name.isBlank() || user.profileImageResId == 0) {
+                        if (!user.isEmailVerified) {
+                            _registrationState.value = RegistrationState.EmailVerificationSent
+                        } else if (user.name.isBlank() || user.profileImageResId == 0) {
                             _registrationState.value = RegistrationState.NeedsProfile
                         } else {
                             _registrationState.value = RegistrationState.Complete
                         }
 
-                        // Intentar obtener el FirebaseUser actual
                         auth.currentUser?.let { firebaseUser ->
                             _authState.value = AuthState.Authenticated(firebaseUser)
-                        } ?: run {
-                            // Si no hay FirebaseUser, intentar una autenticación silenciosa
-                            handleSilentAuth(storedUuid)
-                        }
+                        } ?: handleSilentAuth(storedUuid)
                     } else {
                         handleInvalidCredentials()
                     }
@@ -189,20 +188,26 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val authResult = auth.createUserWithEmailAndPassword(email, password).await()
                 val firebaseUser = authResult.user
                 if (firebaseUser != null) {
+                    // Send email verification
+                    firebaseUser.sendEmailVerification().await()
+
+                    // Create user in database but mark as unverified
                     val newUser = User(
                         uuid = firebaseUser.uid,
                         email = email,
                         name = "",
-                        profileImageResId = 0
+                        profileImageResId = 0,
+                        isEmailVerified = false
                     )
-                    // Primero actualizar el estado de registro
-                    _registrationState.value = RegistrationState.NeedsProfile
-                    // Luego crear el usuario en la base de datos
                     createUserInDatabase(newUser)
+
+                    // Update states
                     _user.value = newUser
-                    saveUserUuid(firebaseUser.uid)
-                    // Finalmente actualizar el estado de autenticación
+                    _registrationState.value = RegistrationState.EmailVerificationSent
                     _authState.value = AuthState.Authenticated(firebaseUser)
+
+                    // Save UUID but mark as unverified
+                    saveUserUuid(firebaseUser.uid, false)
                 } else {
                     _authState.value = AuthState.Error("User creation failed")
                 }
@@ -210,6 +215,57 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 _authState.value = AuthState.Error(e.message ?: "User creation failed")
             }
         }
+    }
+
+    fun verifyEmail() {
+        viewModelScope.launch {
+            try {
+                auth.currentUser?.let { firebaseUser ->
+                    firebaseUser.reload().await()
+                    if (firebaseUser.isEmailVerified) {
+                        // Update user in database
+                        _user.value?.let { currentUser ->
+                            val updatedUser = currentUser.copy(isEmailVerified = true)
+                            updateUserInDatabase(updatedUser)
+                            _user.value = updatedUser
+                        }
+
+                        // Update registration state
+                        _registrationState.value = RegistrationState.NeedsProfile
+
+                        // Update auth state
+                        _authState.value = AuthState.Authenticated(firebaseUser)
+
+                        // Update shared preferences
+                        saveUserUuid(firebaseUser.uid, true)
+                    } else {
+                        _authState.value = AuthState.Error("Email not verified yet")
+                    }
+                }
+            } catch (e: Exception) {
+                _authState.value = AuthState.Error(e.message ?: "Failed to verify email")
+            }
+        }
+    }
+
+    fun resendVerificationEmail() {
+        viewModelScope.launch {
+            try {
+                auth.currentUser?.let { firebaseUser ->
+                    firebaseUser.sendEmailVerification().await()
+                    _registrationState.value = RegistrationState.EmailVerificationSent
+                }
+            } catch (e: Exception) {
+                _authState.value = AuthState.Error(e.message ?: "Failed to resend verification email")
+            }
+        }
+    }
+
+    private fun saveUserUuid(uuid: String, isVerified: Boolean) {
+        val editor = sharedPreferences.edit()
+        editor.putString("uuid", uuid)
+        editor.putBoolean("isEmailVerified", isVerified)
+        editor.apply()
     }
 
     private suspend fun createUserInDatabase(user: User) {

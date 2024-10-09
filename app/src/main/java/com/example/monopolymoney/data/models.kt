@@ -51,7 +51,8 @@ data class User(
     val uuid: String = "",
     val email: String = "",
     val name: String = "",
-    val profileImageResId: Int = 0
+    val profileImageResId: Int = 0,
+    val isEmailVerified: Boolean = false
 ) {
     // Constructor sin argumentos requerido para Firebase
     constructor() : this("", "", "", 0)
@@ -61,7 +62,8 @@ data class User(
             "uuid" to uuid,
             "email" to email,
             "name" to name,
-            "profileImageResId" to profileImageResId
+            "profileImageResId" to profileImageResId,
+            "isEmailVerified" to isEmailVerified
         )
     }
 
@@ -71,7 +73,8 @@ data class User(
                 uuid = map["uuid"] as? String ?: "",
                 email = map["email"] as? String ?: "",
                 name = map["name"] as? String ?: "",
-                profileImageResId = (map["profileImageResId"] as? Long)?.toInt() ?: 0
+                profileImageResId = (map["profileImageResId"] as? Long)?.toInt() ?: 0,
+                isEmailVerified = (map["isEmailVerified"] as? Boolean) ?: false
             )
         }
     }
