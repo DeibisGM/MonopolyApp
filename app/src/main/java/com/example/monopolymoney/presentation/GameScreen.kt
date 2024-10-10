@@ -165,7 +165,11 @@ fun EventLogSection(modifier: Modifier = Modifier, viewModel: DataViewModel) {
     val players by viewModel.players.collectAsState()
 
     Column(modifier = modifier.fillMaxWidth()) {
-        Divider(color = MyYellow, thickness = 0.5.dp, modifier = Modifier.padding(bottom = 20.dp))
+        HorizontalDivider(
+            modifier = Modifier.padding(bottom = 20.dp),
+            thickness = 0.5.dp,
+            color = MyYellow
+        )
 
         if (gameEvents.isEmpty()) {
             EmptyEventLog()
@@ -199,7 +203,7 @@ fun EventList(gameEvents: List<GameEvent>, players: Map<String, Player>) {
         reverseLayout = true
     ) {
         items(gameEvents) { event ->
-            Divider(color = Color.Gray.copy(alpha = 0.5f), thickness = 0.5.dp)
+            HorizontalDivider(thickness = 0.5.dp, color = Color.Gray.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(10.dp))
             when (event) {
                 is GameEvent.TransactionEvent -> TransactionEventCard(event, players)

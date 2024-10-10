@@ -52,7 +52,7 @@ fun LobbyScreen(
     val hostId by viewModel.hostId.collectAsState()
     val gameStatus by viewModel.gameStatus.collectAsState()
 
-    val isHost = userId == hostId;
+    val isHost = userId == hostId
     val isMyTurn = currentPlayer == userId
 
             Box(modifier = Modifier.fillMaxSize()) {
