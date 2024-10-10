@@ -33,7 +33,6 @@ private val MyYellow = Color(0xFFFFD67E)
 private val GeneralPadding = 16.dp
 private val ButtonHeight = 55.dp
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LobbyScreen(
     viewModel: DataViewModel,
@@ -94,18 +93,18 @@ fun WaitingRoomScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp), // Ajusta el padding general
-        verticalArrangement = Arrangement.spacedBy(24.dp), // Añade espacio uniforme entre los elementos
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Título de la pantalla
+
         Text(
             text = "Waiting Room",
             style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary // Aplica color primario
+            color = MaterialTheme.colorScheme.primary
         )
 
-        // Código de sala dentro de una tarjeta
+
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -123,21 +122,20 @@ fun WaitingRoomScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = roomCode ?: "N/A", // Muestra N/A si no hay roomCode
+                    text = roomCode ?: "N/A",
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
         }
 
-        // Botón de comenzar juego, si es el anfitrión
         if (isHost) {
             Button(
                 onClick = viewModel::startGame,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp), // Botón más ancho y centrado
-                shape = RoundedCornerShape(50), // Forma redondeada para un look más suave
+                    .padding(horizontal = 32.dp),
+                shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.secondary
                 )
@@ -145,9 +143,9 @@ fun WaitingRoomScreen(
                 Text("Start Game", style = MaterialTheme.typography.labelLarge)
             }
 
-            Spacer(modifier = Modifier.height(16.dp)) // Espacio entre los botones
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Botón de cancelar partida
+
             Button(
                 onClick = {
                     viewModel.deleteGame()
@@ -156,16 +154,15 @@ fun WaitingRoomScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp),
-                shape = RoundedCornerShape(50), // Forma redondeada para consistencia
+                shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Red // Botón rojo para cancelar
+                    containerColor = Color.Red
                 )
             ) {
                 Text("Cancel Game", style = MaterialTheme.typography.labelLarge, color = Color.White)
             }
         }
 
-        // Lista de jugadores
         Text(
             text = "Players:",
             style = MaterialTheme.typography.titleMedium,
@@ -175,7 +172,7 @@ fun WaitingRoomScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp) // Espacio entre jugadores
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(players.values.toList()) { player ->
                 Card(
@@ -210,9 +207,6 @@ fun WaitingRoomScreen(
     }
 }
 
-
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainButtons(viewModel: DataViewModel) {
     var showCreateRoomDialog by remember { mutableStateOf(false) }
