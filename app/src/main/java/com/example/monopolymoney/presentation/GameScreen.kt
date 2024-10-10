@@ -203,6 +203,7 @@ fun EventList(gameEvents: List<GameEvent>, players: Map<String, Player>) {
             Spacer(modifier = Modifier.height(10.dp))
             when (event) {
                 is GameEvent.TransactionEvent -> TransactionEventCard(event, players)
+                is GameEvent.PlayerJoinRoomEvent -> PlayerJoinEventCard(event)
                 is GameEvent.PlayerLeftEvent -> PlayerLeftEventCard(event)
                 is GameEvent.GameEndedEvent -> {} // Handle game ended event if needed
             }
@@ -253,43 +254,68 @@ fun TransactionEventCard(transaction: GameEvent.TransactionEvent, players: Map<S
 }
 
 @Composable
-fun PlayerLeftEventCard(event: GameEvent.PlayerLeftEvent) {
+fun GameEventCard(
+    profileImageResId: Int,
+    title: String,
+    message: String,
+    modifier: Modifier = Modifier,
+    wasHost: Boolean = false,
+    newHostId: String? = null,
+    titleColor: Color = Color.Black
+) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Image(
-            painter = painterResource(id = event.profileImageResId),
+            painter = painterResource(id = profileImageResId),
             contentDescription = "Player Avatar",
             modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
         )
-        Spacer(modifier = Modifier.width(GeneralPadding))
+        Spacer(modifier = Modifier.width(12.dp))
         Column {
             Text(
-                text = "Player Left",
+                text = title,
                 fontSize = 16.sp,
                 fontFamily = FontFamily(Font(R.font.carisma600)),
-                color = Color.Red.copy(alpha = 0.7f)
+                color = titleColor
             )
             Text(
-                text = "${event.playerName} left the game",
+                text = message,
                 fontFamily = FontFamily(Font(R.font.carisma500)),
                 color = Color.Gray,
                 fontSize = 16.sp
             )
-            if (event.wasHost && event.newHostId != null) {
-                Text(
-                    text = "New host assigned",
-                    fontFamily = FontFamily(Font(R.font.carisma500)),
-                    color = Color.Gray,
-                    fontSize = 14.sp
-                )
-            }
         }
     }
 }
+
+@Composable
+fun PlayerLeftEventCard(event: GameEvent.PlayerLeftEvent) {
+    GameEventCard(
+        profileImageResId = event.profileImageResId,
+        title = "Player Left",
+        message = "${event.playerName} has exited the game", // Evita repetir 'left the game'
+        wasHost = event.wasHost,
+        newHostId = event.newHostId,
+        titleColor = Color.Red.copy(alpha = 0.7f) // Rojo más tenue para eventos negativos
+    )
+}
+
+@Composable
+fun PlayerJoinEventCard(event: GameEvent.PlayerJoinRoomEvent) {
+    GameEventCard(
+        profileImageResId = event.profileImageResId,
+        title = "Player Joined",
+        message = "${event.playerName} has entered the room", // Texto más amigable
+        titleColor = Color.Green.copy(alpha = 0.8f) // Verde para eventos positivos
+    )
+}
+
 
 @Composable
 fun BottomButtonsSection(

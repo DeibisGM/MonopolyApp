@@ -1,6 +1,7 @@
 package com.example.monopolymoney
 
-import AuthScreen
+import EmailVerificationScreen
+import LoginScreen
 import ProfileSetupScreen
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -20,11 +21,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.monopolymoney.data.GameRoom
-import com.example.monopolymoney.presentation.GameEndScreen
-import com.example.monopolymoney.presentation.LobbyScreen
-import com.example.monopolymoney.presentation.MoneyTransferScreen
-import com.example.monopolymoney.presentation.SettingsScreen
+import com.example.monopolymoney.presentation.*
 import com.example.monopolymoney.ui.theme.Shapes
 import com.example.monopolymoney.ui.theme.Typographys
 import com.example.monopolymoney.viewmodel.AuthViewModel
@@ -58,151 +55,164 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+sealed class Route {
+    object Auth : Route() { override fun toString() = "auth" }
+    object EmailVerification : Route() { override fun toString() = "email_verification" }
+    object ProfileSetup : Route() { override fun toString() = "profile_setup" }
+    object Main : Route() { override fun toString() = "main" }
+    object MoneyTransfer : Route() { override fun toString() = "money_transfer" }
+    object BankTransfer : Route() { override fun toString() = "bank_transfer" }
+    object Settings : Route() { override fun toString() = "settings" }
+}
+
 @Composable
 fun MonopolyApp(navController: NavHostController, viewModel: DataViewModel) {
     val authState by viewModel.authState.collectAsState()
-    val user by viewModel.user.collectAsState()
     val registrationState by viewModel.authViewModel.registrationState.collectAsState()
     val showGameOverScreen by viewModel.showGameOverScreen.collectAsState()
 
-    val shouldNavigateToMain by viewModel.shouldNavigateToMain.collectAsState()
-
-    LaunchedEffect(shouldNavigateToMain) {
-        if (shouldNavigateToMain) {
-            navController.navigate("main") {
-                popUpTo("main") { inclusive = true }
-            }
-            viewModel.resetNavigation()
+    when (authState) {
+        is AuthViewModel.AuthState.Loading -> {
+            LoadingScreen(message = "Verificando sesión...")
         }
-    }
+        is AuthViewModel.AuthState.Authenticated -> {
+            val startDestination = when (registrationState) {
+                AuthViewModel.RegistrationState.EmailVerificationSent -> Route.EmailVerification.toString()
+                AuthViewModel.RegistrationState.NeedsProfile -> Route.ProfileSetup.toString()
+                AuthViewModel.RegistrationState.Complete -> Route.Main.toString()
+                else -> Route.Main.toString()
+            }
 
-    LaunchedEffect(authState, registrationState) {
-        when {
-            authState is AuthViewModel.AuthState.Authenticated && registrationState == AuthViewModel.RegistrationState.NeedsProfile -> {
-                if (navController.currentDestination?.route != "profile_setup") {
-                    navController.navigate("profile_setup") {
-                        popUpTo("auth") { inclusive = true }
-                    }
+            NavHost(navController = navController, startDestination = startDestination) {
+                composable(Route.Auth.toString()) {
+                    LoginScreen(
+                        viewModel = viewModel.authViewModel,
+                        onForgotPassword = { /* Implement if needed */ }
+                    )
                 }
-            }
-            authState is AuthViewModel.AuthState.Authenticated && registrationState == AuthViewModel.RegistrationState.Complete -> {
-                if (navController.currentDestination?.route != "main") {
-                    navController.navigate("main") {
-                        popUpTo("auth") { inclusive = true }
-                    }
-                }
-            }
-            authState is AuthViewModel.AuthState.Unauthenticated && registrationState != AuthViewModel.RegistrationState.EmailVerificationSent -> {
-                if (navController.currentDestination?.route != "auth") {
-                    navController.navigate("auth") {
-                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                    }
-                }
-            }
-        }
-    }
 
-    NavHost(navController = navController, startDestination = "auth") {
-        composable("auth") {
-            AuthScreen(viewModel = viewModel.authViewModel)
-        }
-
-        composable("profile_setup") {
-            ProfileSetupScreen(viewModel = viewModel.authViewModel)
-        }
-
-        composable("main") {
-            when {
-                showGameOverScreen -> {
-                    GameEndScreen(
-                        viewModel = viewModel,
-                        onNavigateToHome = {
-                            viewModel.leaveGameOverScreen()
+                composable(Route.EmailVerification.toString()) {
+                    EmailVerificationScreen(
+                        viewModel = viewModel.authViewModel,
+                        email = (viewModel.authViewModel.user.collectAsState().value?.email ?: ""),
+                        onBackToLogin = {
+                            viewModel.authViewModel.signOut()
+                            navController.navigate(Route.Auth.toString()) {
+                                popUpTo(0) { inclusive = true }
+                            }
                         }
                     )
                 }
-                user != null -> {
-                    LobbyScreen(
-                        viewModel = viewModel,
-                        onNavigateToMoneyTransfer = { navController.navigate("moneyTransfer") },
-                        onNavigateToBankTransfer = { navController.navigate("bankTransfer") },
-                        onNavigateToSettings = { navController.navigate("settings") },
-                        onNavigateToHome = {
-                            viewModel.leaveGameOverScreen()
-                        }
-                    )
+
+                composable(Route.ProfileSetup.toString()) {
+                    ProfileSetupScreen(viewModel = viewModel.authViewModel)
                 }
-                else -> {
-                    LaunchedEffect(Unit) {
-                        navController.navigate("auth") {
-                            popUpTo(navController.graph.startDestinationId) { inclusive = true }
+
+                composable(Route.Main.toString()) {
+                    if (showGameOverScreen) {
+                        GameEndScreen(
+                            viewModel = viewModel,
+                            onNavigateToHome = {
+                                viewModel.leaveGameOverScreen()
+                            }
+                        )
+                    } else {
+                        LobbyScreen(
+                            viewModel = viewModel,
+                            onNavigateToMoneyTransfer = { navController.navigate(Route.MoneyTransfer.toString()) },
+                            onNavigateToBankTransfer = { navController.navigate(Route.BankTransfer.toString()) },
+                            onNavigateToSettings = { navController.navigate(Route.Settings.toString()) },
+                            onNavigateToHome = {
+                                viewModel.leaveGameOverScreen()
+                            }
+                        )
+                    }
+                }
+
+                composable(Route.MoneyTransfer.toString()) {
+                    val players by viewModel.players.collectAsState()
+                    val currentPlayer by viewModel.currentPlayer.collectAsState()
+                    val roomCode by viewModel.roomCode.collectAsState()
+                    val hostId by viewModel.hostId.collectAsState()
+                    val user by viewModel.user.collectAsState()
+                    val userId = user?.uuid
+
+                    if (currentPlayer != null && roomCode != null && userId != null) {
+                        MoneyTransferScreen(
+                            players = players,
+                            myPlayerId = userId,
+                            onTransactionComplete = { amount, toPlayerId ->
+                                viewModel.makeTransaction(userId, toPlayerId, amount)
+                                navController.popBackStack()
+                            },
+                            onCancel = { navController.popBackStack() },
+                            isBankMode = false,
+                            isHost = userId == hostId,
+                            isMyTurn = userId == currentPlayer
+                        )
+                    } else {
+                        Text("Error: Room or player information not found")
+                        LaunchedEffect(Unit) {
+                            navController.popBackStack()
                         }
                     }
                 }
+
+                composable(Route.BankTransfer.toString()) {
+                    val players by viewModel.players.collectAsState()
+                    val currentPlayer by viewModel.currentPlayer.collectAsState()
+                    val roomCode by viewModel.roomCode.collectAsState()
+                    val hostId by viewModel.hostId.collectAsState()
+                    val user by viewModel.user.collectAsState()
+                    val userId = user?.uuid
+
+                    if (currentPlayer != null && roomCode != null && userId != null) {
+                        MoneyTransferScreen(
+                            players = players,
+                            myPlayerId = userId,
+                            onTransactionComplete = { amount, toPlayerId ->
+                                viewModel.makeBankTransaction(toPlayerId, amount)
+                                navController.popBackStack()
+                            },
+                            onCancel = { navController.popBackStack() },
+                            isBankMode = true,
+                            isHost = userId == hostId,
+                            isMyTurn = userId == currentPlayer
+                        )
+                    } else {
+                        Text("Error: Room or player information not found")
+                        LaunchedEffect(Unit) {
+                            navController.popBackStack()
+                        }
+                    }
+                }
+
+                composable(Route.Settings.toString()) {
+                    SettingsScreen(
+                        viewModel = viewModel.authViewModel,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
             }
         }
-
-        composable("moneyTransfer") {
-            val players by viewModel.players.collectAsState()
-            val currentPlayer by viewModel.currentPlayer.collectAsState()
-            val roomCode by viewModel.roomCode.collectAsState()
-            val hostId by viewModel.hostId.collectAsState()
-            val userId = user?.uuid
-
-            if (currentPlayer != null && roomCode != null && userId != null) {
-                MoneyTransferScreen(
-                    players = players,
-                    myPlayerId = userId,
-                    onTransactionComplete = { amount, toPlayerId ->
-                        viewModel.makeTransaction(userId, toPlayerId, amount)
-                        navController.popBackStack()
-                    },
-                    onCancel = { navController.popBackStack() },
-                    isBankMode = false,
-                    isHost = userId == hostId,
-                    isMyTurn = userId == currentPlayer
-                )
-            } else {
-                Text("Error: Room or player information not found")
-                LaunchedEffect(Unit) {
-                    navController.popBackStack()
+        is AuthViewModel.AuthState.Unauthenticated -> {
+            NavHost(navController = navController, startDestination = Route.Auth.toString()) {
+                composable(Route.Auth.toString()) {
+                    LoginScreen(
+                        viewModel = viewModel.authViewModel,
+                        onForgotPassword = { /* Implement if needed */ }
+                    )
+                }
+            }
+        }
+        is AuthViewModel.AuthState.Error -> {
+            LaunchedEffect(Unit) {
+                navController.navigate(Route.Auth.toString()) {
+                    popUpTo(0) { inclusive = true }
                 }
             }
         }
 
-        composable("settings") {
-            SettingsScreen(
-                viewModel = viewModel.authViewModel,
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        composable("bankTransfer") {
-            val players by viewModel.players.collectAsState()
-            val currentPlayer by viewModel.currentPlayer.collectAsState()
-            val roomCode by viewModel.roomCode.collectAsState()
-            val hostId by viewModel.hostId.collectAsState()
-            val userId = user?.uuid
-
-            if (currentPlayer != null && roomCode != null && userId != null) {
-                MoneyTransferScreen(
-                    players = players,
-                    myPlayerId = userId,
-                    onTransactionComplete = { amount, toPlayerId ->
-                        viewModel.makeBankTransaction(toPlayerId, amount)
-                        navController.popBackStack()
-                    },
-                    onCancel = { navController.popBackStack() },
-                    isBankMode = true,
-                    isHost = userId == hostId,
-                    isMyTurn = userId == currentPlayer
-                )
-            } else {
-                Text("Error: Room or player information not found")
-                LaunchedEffect(Unit) {
-                    navController.popBackStack()
-                }
-            }
-        }
+        AuthViewModel.AuthState.ResetEmailSent -> TODO()
     }
 }

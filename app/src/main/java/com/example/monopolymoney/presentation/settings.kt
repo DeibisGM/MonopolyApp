@@ -232,7 +232,6 @@ fun SettingsScreen(
             onDismiss = { showDeleteAccountDialog = false },
             onConfirmDelete = {
                 viewModel.deleteAccount()
-                onNavigateBack()
             }
         )
     }

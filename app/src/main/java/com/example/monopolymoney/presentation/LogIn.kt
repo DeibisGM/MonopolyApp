@@ -26,17 +26,17 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
 
 @Composable
-fun AuthScreen(
+fun LoginScreen(
     viewModel: AuthViewModel,
+    onForgotPassword: () -> Unit,
+    //onEmailVerificationNeeded: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var showForgotPasswordDialog by remember { mutableStateOf(false) }
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
 
     val authState by viewModel.authState.collectAsState()
-    val registrationState by viewModel.registrationState.collectAsState()
 
     Column(
         modifier = Modifier
@@ -44,205 +44,157 @@ fun AuthScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.Center
     ) {
-        when (registrationState) {
-            is AuthViewModel.RegistrationState.EmailVerificationSent -> {
-                Text(
-                    text = "Please verify your email",
-                    style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-                Text(
-                    text = "We've sent a verification email to $email. Please check your inbox and click the verification link.",
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-                Button(
-                    onClick = {
-                        viewModel.verifyEmail()
-                        feedbackMessage = "Checking email verification status..."
-//                        if (authState is AuthViewModel.AuthState.Error) {
-//                            feedbackMessage = "Checking email verification status..." + (authState as AuthViewModel.AuthState.Error).message
-//                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                ) {
-                    Text("I've verified my email")
-                }
-                TextButton(
-                    onClick = {
-                        viewModel.resendVerificationEmail()
-                        feedbackMessage = "Verification email resent. Please check your inbox."
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Resend verification email")
-                }
+        Text(
+            text = "Login to Monopoly Money",
+            style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
 
-                Spacer(modifier = Modifier.height(16.dp))
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email") },
+            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Email),
+            modifier = Modifier.fillMaxWidth(),
+            isError = email.isEmpty()
+        )
 
-                OutlinedButton(
-                    onClick = {
-                        feedbackMessage = null
-                        viewModel.signOut() // This will trigger a state change to Unauthenticated
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Back to Login")
-                }
+        Spacer(modifier = Modifier.height(16.dp))
 
-                feedbackMessage?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 16.dp)
-                    )
-                }
-            }
-            else -> {
-                Text(
-                    text = "Login to Monopoly Money",
-                    style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.padding(bottom = 24.dp)
-                )
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password") },
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Password),
+            modifier = Modifier.fillMaxWidth(),
+            isError = password.isEmpty()
+        )
 
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = { Text("Email") },
-                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Email),
-                    modifier = Modifier.fillMaxWidth(),
-                    isError = email.isEmpty()  // Marca como error si el email está vacío
-                )
+        Spacer(modifier = Modifier.height(8.dp))
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Password") },
-                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Password),
-                    modifier = Modifier.fillMaxWidth(),
-                    isError = password.isEmpty()  // Marca como error si la contraseña está vacía
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                TextButton(
-                    onClick = { showForgotPasswordDialog = true },
-                    modifier = Modifier.align(Alignment.End)
-                ) {
-                    Text("Forgot Password?")
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = {
-                        if (email.isNotBlank() && password.isNotBlank()) {
-                            viewModel.loginUser(email, password)
-                        } else {
-                            feedbackMessage = "Please enter both email and password."
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                ) {
-                    Text(text = "Log In")
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = {
-                        if (email.isNotBlank() && password.isNotBlank()) {
-                            viewModel.createUser(email, password)
-                        } else {
-                            feedbackMessage = "Please enter both email and password."
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                ) {
-                    Text(text = "Sign Up")
-                }
-
-                if (authState is AuthViewModel.AuthState.Error) {
-                    Text(
-                        text = (authState as AuthViewModel.AuthState.Error).message,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 16.dp)
-                    )
-                } else if (authState is AuthViewModel.AuthState.ResetEmailSent) {
-                    Text(
-                        text = "Password reset email sent!",
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 16.dp)
-                    )
-                }
-
-                feedbackMessage?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 16.dp)
-                    )
-                }
-            }
+        TextButton(
+            onClick = onForgotPassword,
+            modifier = Modifier.align(Alignment.End)
+        ) {
+            Text("Forgot Password?")
         }
 
-        if (showForgotPasswordDialog) {
-            var resetEmail by remember { mutableStateOf(email) }
+        Spacer(modifier = Modifier.height(16.dp))
 
-            AlertDialog(
-                onDismissRequest = { showForgotPasswordDialog = false },
-                title = {
-                    Text("Reset Password", style = MaterialTheme.typography.headlineSmall)
-                },
-                text = {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            "Enter your email to receive a password reset link.",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        OutlinedTextField(
-                            value = resetEmail,
-                            onValueChange = { resetEmail = it },
-                            label = { Text("Email") },
-                            modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Email)
-                        )
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            if (resetEmail.isNotEmpty()) {
-                                viewModel.sendPasswordResetEmail(resetEmail)
-                                showForgotPasswordDialog = false
-                            }
-                        },
-                        modifier = Modifier.padding(8.dp)
-                    ) {
-                        Text("Send Link")
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { showForgotPasswordDialog = false },
-                        modifier = Modifier.padding(8.dp)
-                    ) {
-                        Text("Cancel")
-                    }
+        Button(
+            onClick = {
+                if (email.isNotBlank() && password.isNotBlank()) {
+                    viewModel.loginUser(email, password)
+                } else {
+                    feedbackMessage = "Please enter both email and password."
                 }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+        ) {
+            Text(text = "Log In")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                if (email.isNotBlank() && password.isNotBlank()) {
+                    viewModel.createUser(email, password)
+                    //onEmailVerificationNeeded()
+                } else {
+                    feedbackMessage = "Please enter both email and password."
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+        ) {
+            Text(text = "Sign Up")
+        }
+
+        if (authState is AuthViewModel.AuthState.Error) {
+            Text(
+                text = (authState as AuthViewModel.AuthState.Error).message,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+        }
+
+        feedbackMessage?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun EmailVerificationScreen(
+    viewModel: AuthViewModel,
+    email: String,
+    onBackToLogin: () -> Unit
+) {
+    var feedbackMessage by remember { mutableStateOf<String?>(null) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Please verify your email",
+            style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        Text(
+            text = "We've sent a verification email to $email. Please check your inbox and click the verification link.",
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        Button(
+            onClick = {
+                viewModel.verifyEmail()
+                feedbackMessage = "Checking email verification status..."
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+        ) {
+            Text("I've verified my email")
+        }
+        TextButton(
+            onClick = {
+                viewModel.resendVerificationEmail()
+                feedbackMessage = "Verification email resent. Please check your inbox."
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Resend verification email")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedButton(
+            onClick = {
+                feedbackMessage = null
+                viewModel.signOut()
+                onBackToLogin()
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Back to Login")
+        }
+
+        feedbackMessage?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 16.dp)
             )
         }
     }
@@ -265,7 +217,6 @@ fun ProfileSetupScreen(
         R.drawable.faces13, R.drawable.faces14,
         R.drawable.faces15, R.drawable.faces16,
         R.drawable.faces17
-        // Add more profile images as needed
     )
 
     Column(
@@ -299,7 +250,8 @@ fun ProfileSetupScreen(
         LazyVerticalGrid(
             columns = GridCells.Fixed(5),
             contentPadding = PaddingValues(0.dp),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
                 .heightIn(max = 300.dp)
         ) {
             items(profileImages) { imageResId ->
@@ -309,9 +261,9 @@ fun ProfileSetupScreen(
                     contentDescription = "Profile image",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .aspectRatio(1f)  // Hace que la imagen sea cuadrada y luego se convierte en circular
+                        .aspectRatio(1f)
                         .padding(6.dp)
-                        .clip(CircleShape)  // Hace la imagen circular
+                        .clip(CircleShape)
                         .border(
                             width = if (isSelected) 2.dp else 0.dp,
                             color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),

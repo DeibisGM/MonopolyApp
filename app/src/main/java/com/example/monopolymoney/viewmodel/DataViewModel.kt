@@ -6,11 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
-import com.example.monopolymoney.data.GameEvent
-import com.example.monopolymoney.data.GameRoom
-import com.example.monopolymoney.data.GameRoomRepository
-import com.example.monopolymoney.data.Player
-import com.example.monopolymoney.data.User
+import com.example.monopolymoney.data.*
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.flow.*
@@ -18,54 +14,65 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 class DataViewModel private constructor(application: Application) : AndroidViewModel(application) {
+
+    // Dependencies
     val authViewModel: AuthViewModel = AuthViewModel(application)
     private val gameRoomRepository = GameRoomRepository()
     private val database: DatabaseReference = FirebaseDatabase.getInstance().reference
 
-    // Auth State
+    // State Management
+    private val _gameRoom = MutableStateFlow<GameRoom?>(null)
+    private val _showGameOverScreen = MutableStateFlow(false)
+    private val _shouldNavigateToMain = MutableStateFlow(false)
+    private var lastKnownRoomCode: String? = null
+
+    // Public State Flows
     val authState: StateFlow<AuthViewModel.AuthState> = authViewModel.authState
     val user: StateFlow<User?> = authViewModel.user
-
-    // GameRoom State
-    private val _gameRoom = MutableStateFlow<GameRoom?>(null)
     val gameRoom: StateFlow<GameRoom?> = _gameRoom.asStateFlow()
-
-    // Nuevo estado para controlar la visibilidad de la pantalla de Game Over
-    private val _showGameOverScreen = MutableStateFlow(false)
     val showGameOverScreen: StateFlow<Boolean> = _showGameOverScreen.asStateFlow()
-
-    private val _shouldNavigateToMain = MutableStateFlow(false)
     val shouldNavigateToMain: StateFlow<Boolean> = _shouldNavigateToMain.asStateFlow()
 
-    // Convenience accessors for GameRoom data
-    val players: StateFlow<Map<String, Player>> = _gameRoom.map { it?.players ?: emptyMap() }
+    // Derived State Flows
+    val players: StateFlow<Map<String, Player>> = _gameRoom
+        .map { it?.players ?: emptyMap() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
-    val transactions: StateFlow<List<GameEvent>> = _gameRoom.map { it?.gameEvents ?: emptyList() }
+    val transactions: StateFlow<List<GameEvent>> = _gameRoom
+        .map { it?.gameEvents ?: emptyList() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    val currentPlayer: StateFlow<String?> = _gameRoom.map { it?.currentPlayerId }
+    val currentPlayer: StateFlow<String?> = _gameRoom
+        .map { it?.currentPlayerId }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    val gameStarted: StateFlow<Boolean> = _gameRoom.map { it?.status == GameRoom.GameStatus.STARTED }
+    val gameStarted: StateFlow<Boolean> = _gameRoom
+        .map { it?.status == GameRoom.GameStatus.STARTED }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    val roomCode: StateFlow<String?> = _gameRoom.map { it?.roomCode }
+    val roomCode: StateFlow<String?> = _gameRoom
+        .map { it?.roomCode }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    val hostId: StateFlow<String?> = _gameRoom.map { it?.hostId }
+    val hostId: StateFlow<String?> = _gameRoom
+        .map { it?.hostId }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    val gameStatus: StateFlow<GameRoom.GameStatus?> = _gameRoom.map { it?.status }
+    val gameStatus: StateFlow<GameRoom.GameStatus?> = _gameRoom
+        .map { it?.status }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    // ==========================
     // Room Management Methods
-    // ==========================
     fun createRoom() {
         viewModelScope.launch {
             user.value?.let { currentUser ->
-                val player = Player(currentUser.uuid, currentUser.name, 1500, currentUser.profileImageResId, true)
+                val player = Player(
+                    currentUser.uuid,
+                    currentUser.name,
+                    1500,
+                    currentUser.profileImageResId,
+                    true
+                )
                 val newGameRoom = gameRoomRepository.createGameRoom(currentUser.uuid, player)
                 _gameRoom.value = newGameRoom
                 observeGameRoom(newGameRoom.roomCode)
@@ -78,13 +85,35 @@ class DataViewModel private constructor(application: Application) : AndroidViewM
             try {
                 user.value?.let { currentUser ->
                     val roomSnapshot = gameRoomRepository.getRoomSnapshot(code)
-                    if (roomSnapshot != null) {
-                        val currentRoom = GameRoom.fromMap(roomSnapshot)
-                        if (currentRoom != null) {
-                            val player = Player(currentUser.uuid, currentUser.name, 1500, currentUser.profileImageResId, false)
-                            val updatedRoom = currentRoom.copy(
-                                players = currentRoom.players + (currentUser.uuid to player)
+                    roomSnapshot?.let { snapshot ->
+                        GameRoom.fromMap(snapshot)?.let { currentRoom ->
+                            val player = Player(
+                                currentUser.uuid,
+                                currentUser.name,
+                                1500,
+                                currentUser.profileImageResId,
+                                false
                             )
+
+                            val playerJoinEvent = GameEvent.PlayerJoinRoomEvent(
+                                id = currentRoom.gameEvents.size,
+                                playerId = currentUser.uuid,
+                                playerName = currentUser.name,
+                                profileImageResId = currentUser.profileImageResId,
+                                isHost = false
+                            )
+
+                            val updatedEvents = if (currentRoom.status == GameRoom.GameStatus.STARTED) {
+                                currentRoom.gameEvents + playerJoinEvent
+                            } else {
+                                currentRoom.gameEvents
+                            }
+
+                            val updatedRoom = currentRoom.copy(
+                                players = currentRoom.players + (currentUser.uuid to player),
+                                gameEvents = updatedEvents
+                            )
+
                             gameRoomRepository.updateGameRoom(updatedRoom)
                             observeGameRoom(code)
                             _gameRoom.value = updatedRoom
@@ -92,7 +121,7 @@ class DataViewModel private constructor(application: Application) : AndroidViewM
                     }
                 }
             } catch (e: Exception) {
-                // Handle error appropriately
+                Log.e("DataViewModel", "Error joining room: ${e.message}")
             }
         }
     }
@@ -131,61 +160,76 @@ class DataViewModel private constructor(application: Application) : AndroidViewM
         viewModelScope.launch {
             _gameRoom.value?.let { currentRoom ->
                 user.value?.let { currentUser ->
-                    val currentPlayer = currentRoom.players[currentUser.uuid]
-                    if (currentPlayer != null) {
-                        val updatedPlayers = currentRoom.players - currentUser.uuid
-
-                        // Si no quedan más jugadores, termina el juego
-                        if (updatedPlayers.isEmpty()) {
-                            endGame()
-                            return@launch
-                        }
-
-                        // Si el jugador que sale era el actual, pasar al siguiente
-                        var nextPlayerId = currentRoom.currentPlayerId
-                        if (currentUser.uuid == currentRoom.currentPlayerId) {
-                            val playerIds = updatedPlayers.keys.toList()
-                            val currentIndex = playerIds.indexOf(currentUser.uuid)
-                            nextPlayerId = playerIds.getOrNull((currentIndex + 1) % playerIds.size)
-                        }
-
-                        // Si el host está saliendo, transferir el rol al siguiente jugador
-                        val newHostId = if (currentPlayer.isHost && updatedPlayers.isNotEmpty()) {
-                            updatedPlayers.keys.first()
-                        } else null
-
-                        // Actualizar isHost para el nuevo host
-                        val finalUpdatedPlayers = if (newHostId != null) {
-                            updatedPlayers.mapValues { (playerId, player) ->
-                                if (playerId == newHostId) player.copy(isHost = true)
-                                else player.copy(isHost = false)
-                            }
-                        } else updatedPlayers
-
-                        // Crear evento de salida del jugador
-                        val playerLeftEvent = GameEvent.PlayerLeftEvent(
-                            id = currentRoom.gameEvents.size,
-                            playerId = currentUser.uuid,
-                            playerName = currentPlayer.name ?: "Unknown",
-                            profileImageResId = currentPlayer.profileImageResId,
-                            wasHost = currentPlayer.isHost,
-                            newHostId = newHostId
-                        )
-
-                        // Actualizar la sala
-                        val updatedRoom = currentRoom.copy(
-                            players = finalUpdatedPlayers,
-                            hostId = newHostId ?: currentRoom.hostId,
-                            currentPlayerId = nextPlayerId,
-                            gameEvents = currentRoom.gameEvents + playerLeftEvent
-                        )
-
-                        gameRoomRepository.updateGameRoom(updatedRoom)
-                        _gameRoom.value = null
-                    }
+                    handlePlayerLeaving(currentRoom, currentUser)
                 }
             }
         }
+    }
+
+    private suspend fun handlePlayerLeaving(currentRoom: GameRoom, currentUser: User) {
+        val currentPlayer = currentRoom.players[currentUser.uuid] ?: return
+        val updatedPlayers = currentRoom.players - currentUser.uuid
+
+        if (updatedPlayers.isEmpty()) {
+            endGame()
+            return
+        }
+
+        val nextPlayerId = determineNextPlayer(currentRoom, currentUser, updatedPlayers)
+        val newHostId = determineNewHost(currentPlayer, updatedPlayers)
+        val finalUpdatedPlayers = updatePlayersWithNewHost(updatedPlayers, newHostId)
+
+        val playerLeftEvent = createPlayerLeftEvent(currentRoom, currentUser, currentPlayer, newHostId)
+
+        val updatedRoom = currentRoom.copy(
+            players = finalUpdatedPlayers,
+            hostId = newHostId ?: currentRoom.hostId,
+            currentPlayerId = nextPlayerId,
+            gameEvents = currentRoom.gameEvents + playerLeftEvent
+        )
+
+        gameRoomRepository.updateGameRoom(updatedRoom)
+        _gameRoom.value = null
+    }
+
+    private fun determineNextPlayer(currentRoom: GameRoom, currentUser: User, updatedPlayers: Map<String, Player>): String? {
+        return if (currentUser.uuid == currentRoom.currentPlayerId) {
+            val playerIds = updatedPlayers.keys.toList()
+            val currentIndex = playerIds.indexOf(currentUser.uuid)
+            playerIds.getOrNull((currentIndex + 1) % playerIds.size)
+        } else {
+            currentRoom.currentPlayerId
+        }
+    }
+
+    private fun determineNewHost(currentPlayer: Player, updatedPlayers: Map<String, Player>): String? {
+        return if (currentPlayer.isHost && updatedPlayers.isNotEmpty()) {
+            updatedPlayers.keys.first()
+        } else null
+    }
+
+    private fun updatePlayersWithNewHost(players: Map<String, Player>, newHostId: String?): Map<String, Player> {
+        return if (newHostId != null) {
+            players.mapValues { (playerId, player) ->
+                player.copy(isHost = playerId == newHostId)
+            }
+        } else players
+    }
+
+    private fun createPlayerLeftEvent(
+        currentRoom: GameRoom,
+        currentUser: User,
+        currentPlayer: Player,
+        newHostId: String?
+    ): GameEvent.PlayerLeftEvent {
+        return GameEvent.PlayerLeftEvent(
+            id = currentRoom.gameEvents.size,
+            playerId = currentUser.uuid,
+            playerName = currentPlayer.name ?: "Unknown",
+            profileImageResId = currentPlayer.profileImageResId,
+            wasHost = currentPlayer.isHost,
+            newHostId = newHostId
+        )
     }
 
     fun endGame() {
@@ -213,117 +257,100 @@ class DataViewModel private constructor(application: Application) : AndroidViewM
                 user.value?.let { currentUser ->
                     val updatedPlayers = currentRoom.players - currentUser.uuid
 
-                    Log.d("DataViewModel", "Jugadores restantes: ${updatedPlayers.size}")
-
                     if (updatedPlayers.isEmpty()) {
-                        Log.d("DataViewModel", "Eliminando sala: ${currentRoom.roomCode}")
                         deleteGame()
                     } else {
                         val updatedRoom = currentRoom.copy(players = updatedPlayers)
                         gameRoomRepository.updateGameRoom(updatedRoom)
                     }
 
-                    // Trigger navigation immediately after updating the room
-                    _showGameOverScreen.value = false
-                    _shouldNavigateToMain.value = true
-                    _gameRoom.value = null
+                    navigateToMain()
                 }
-            } ?: run {
-                // Si _gameRoom.value es null, intentamos eliminar la sala usando el último código conocido
-                Log.d("DataViewModel", "GameRoom es null, intentando eliminar con el último código conocido")
-                deleteGame()
-            }
+            } ?: deleteGame()
         }
+    }
+
+    private fun navigateToMain() {
+        _showGameOverScreen.value = false
+        _shouldNavigateToMain.value = true
+        _gameRoom.value = null
     }
 
     fun deleteGame() {
         viewModelScope.launch {
             val roomCodeToDelete = _gameRoom.value?.roomCode ?: lastKnownRoomCode
-            if (roomCodeToDelete != null) {
-                Log.d("DataViewModel", "Eliminando sala: $roomCodeToDelete")
+            roomCodeToDelete?.let {
                 try {
-                    database.child("rooms").child(roomCodeToDelete).removeValue().await()
+                    database.child("rooms").child(it).removeValue().await()
                     _gameRoom.value = null
                     lastKnownRoomCode = null
-                    Log.d("DataViewModel", "Sala eliminada: $roomCodeToDelete")
                 } catch (e: Exception) {
-                    Log.e("DataViewModel", "Error al eliminar sala: ${e.message}")
+                    Log.e("DataViewModel", "Error deleting room: ${e.message}")
                 }
-            } else {
-                Log.d("DataViewModel", "No se pudo eliminar la sala: código de sala desconocido")
             }
         }
     }
-
-    // Agregar esta variable para mantener el último código de sala conocido
-    private var lastKnownRoomCode: String? = null
 
     fun resetNavigation() {
         _shouldNavigateToMain.value = false
     }
 
-    // ==========================
     // Transaction Methods
-    // ==========================
     fun makeTransaction(fromPlayerId: String, toPlayerId: String, amount: Int) {
         viewModelScope.launch {
             _gameRoom.value?.let { currentRoom ->
-                val updatedPlayers = currentRoom.players.mapValues { (playerId, player) ->
-                    when (playerId) {
-                        fromPlayerId -> player.copy(balance = player.balance - amount)
-                        toPlayerId -> player.copy(balance = player.balance + amount)
-                        else -> player
-                    }
-                }
-
-                val newTransaction = GameEvent.TransactionEvent(
-                    id = currentRoom.gameEvents.size,
-                    fromPlayerId = fromPlayerId,
-                    toPlayerId = toPlayerId,
-                    amount = amount
-                )
-
-                val updatedRoom = currentRoom.copy(
-                    players = updatedPlayers,
-                    gameEvents = currentRoom.gameEvents + newTransaction
-                )
-
-                gameRoomRepository.updateGameRoom(updatedRoom)
+                val updatedPlayers = updatePlayerBalances(currentRoom.players, fromPlayerId, toPlayerId, amount)
+                val newTransaction = createTransactionEvent(currentRoom.gameEvents.size, fromPlayerId, toPlayerId, amount)
+                updateGameRoomWithTransaction(currentRoom, updatedPlayers, newTransaction)
             }
         }
     }
 
     fun makeBankTransaction(toPlayerId: String, amount: Int) {
-        viewModelScope.launch {
-            _gameRoom.value?.let { currentRoom ->
-                val updatedPlayers = currentRoom.players.mapValues { (playerId, player) ->
-                    if (playerId == toPlayerId) {
-                        player.copy(balance = player.balance + amount)
-                    } else {
-                        player
-                    }
-                }
+        makeTransaction("-1", toPlayerId, amount)
+    }
 
-                val newTransaction = GameEvent.TransactionEvent(
-                    id = currentRoom.gameEvents.size,
-                    fromPlayerId = "-1", // Bank ID
-                    toPlayerId = toPlayerId,
-                    amount = amount
-                )
-
-                val updatedRoom = currentRoom.copy(
-                    players = updatedPlayers,
-                    gameEvents = currentRoom.gameEvents + newTransaction
-                )
-
-                gameRoomRepository.updateGameRoom(updatedRoom)
+    private fun updatePlayerBalances(
+        players: Map<String, Player>,
+        fromPlayerId: String,
+        toPlayerId: String,
+        amount: Int
+    ): Map<String, Player> {
+        return players.mapValues { (playerId, player) ->
+            when (playerId) {
+                fromPlayerId -> player.copy(balance = player.balance - amount)
+                toPlayerId -> player.copy(balance = player.balance + amount)
+                else -> player
             }
         }
     }
 
-    // ==========================
-    // Companion Object
-    // ==========================
+    private fun createTransactionEvent(
+        eventId: Int,
+        fromPlayerId: String,
+        toPlayerId: String,
+        amount: Int
+    ): GameEvent.TransactionEvent {
+        return GameEvent.TransactionEvent(
+            id = eventId,
+            fromPlayerId = fromPlayerId,
+            toPlayerId = toPlayerId,
+            amount = amount
+        )
+    }
+
+    private suspend fun updateGameRoomWithTransaction(
+        currentRoom: GameRoom,
+        updatedPlayers: Map<String, Player>,
+        newTransaction: GameEvent.TransactionEvent
+    ) {
+        val updatedRoom = currentRoom.copy(
+            players = updatedPlayers,
+            gameEvents = currentRoom.gameEvents + newTransaction
+        )
+        gameRoomRepository.updateGameRoom(updatedRoom)
+    }
+
     companion object {
         @Volatile
         private var instance: DataViewModel? = null

@@ -95,6 +95,25 @@ sealed class GameEvent {
         )
     }
 
+    data class PlayerJoinRoomEvent(
+        val id: Int = 0,
+        val playerId: String = "",
+        val playerName: String = "",
+        val profileImageResId: Int = 0,
+        val isHost: Boolean = false,
+        val timestamp: Long = System.currentTimeMillis()
+    ) : GameEvent() {
+        fun toMap(): Map<String, Any> = mapOf(
+            "type" to "PLAYER_JOIN_ROOM",
+            "id" to id,
+            "playerId" to playerId,
+            "playerName" to playerName,
+            "profileImageResId" to profileImageResId,
+            "isHost" to isHost,
+            "timestamp" to timestamp
+        )
+    }
+
     data class PlayerLeftEvent(
         val id: Int = 0,
         val playerId: String = "",
@@ -153,6 +172,14 @@ sealed class GameEvent {
                     finalBalances = (map["finalBalances"] as? Map<String, Number>)?.mapValues { it.value.toInt() } ?: emptyMap(),
                     timestamp = (map["timestamp"] as? Number)?.toLong() ?: System.currentTimeMillis()
                 )
+                "PLAYER_JOIN_ROOM" -> PlayerJoinRoomEvent(
+                    id = (map["id"] as? Number)?.toInt() ?: 0,
+                    playerId = map["playerId"] as String,
+                    playerName = map["playerName"] as String,
+                    profileImageResId = (map["profileImageResId"] as? Number)?.toInt() ?: 0,
+                    isHost = map["isHost"] as Boolean,
+                    timestamp = (map["timestamp"] as? Number)?.toLong() ?: System.currentTimeMillis()
+                )
                 else -> null
             }
         }
@@ -178,6 +205,7 @@ data class GameRoom(
         "gameEvents" to gameEvents.map {
             when (it) {
                 is GameEvent.TransactionEvent -> it.toMap()
+                is GameEvent.PlayerJoinRoomEvent -> it.toMap()
                 is GameEvent.PlayerLeftEvent -> it.toMap()
                 is GameEvent.GameEndedEvent -> it.toMap()
             }

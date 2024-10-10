@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.example.monopolymoney.data.GameRoom
+import com.example.monopolymoney.viewmodel.AuthViewModel
 import com.example.monopolymoney.viewmodel.DataViewModel
 
 private val MyYellow = Color(0xFFFFD67E)
@@ -41,6 +42,7 @@ fun LobbyScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToHome: () -> Unit
 ) {
+    val authState by viewModel.authState.collectAsState()
     val roomCode by viewModel.roomCode.collectAsState()
     val gameStarted by viewModel.gameStarted.collectAsState()
     val players by viewModel.players.collectAsState()
@@ -50,37 +52,39 @@ fun LobbyScreen(
     val hostId by viewModel.hostId.collectAsState()
     val gameStatus by viewModel.gameStatus.collectAsState()
 
-    val isHost = userId == hostId
+    val isHost = userId == hostId;
     val isMyTurn = currentPlayer == userId
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (gameStarted) {
-            IconButton(
-                onClick = { onNavigateToSettings() },
-                modifier = Modifier.align(Alignment.TopStart).padding(GeneralPadding)
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.end),
-                    contentDescription = "Settings",
-                    tint = Color.White
-                )
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (roomCode == null) {
+                    IconButton(
+                        onClick = { onNavigateToSettings() },
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(GeneralPadding)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.end),
+                            contentDescription = "Settings",
+                            tint = Color.White
+                        )
+                    }
+                }
+
+                when {
+                    roomCode == null -> MainButtons(viewModel)
+                    gameStatus == GameRoom.GameStatus.FINISHED -> GameEndScreen(viewModel, onNavigateToHome)
+                    !gameStarted -> WaitingRoomScreen(viewModel, players, roomCode, isHost, onNavigateToHome)
+                    else -> GameScreen(
+                        viewModel = viewModel,
+                        onNavigateToMoneyTransfer = onNavigateToMoneyTransfer,
+                        onNavigateToBankTransfer = onNavigateToBankTransfer,
+                        isMyTurn = isMyTurn,
+                        isHost = isHost
+                    )
+                }
             }
         }
-
-        when {
-            roomCode == null -> MainButtons(viewModel)
-            gameStatus == GameRoom.GameStatus.FINISHED -> GameEndScreen(viewModel, onNavigateToHome)
-            !gameStarted -> WaitingRoomScreen(viewModel, players, roomCode, isHost, onNavigateToHome)
-            else -> GameScreen(
-                viewModel = viewModel,
-                onNavigateToMoneyTransfer = onNavigateToMoneyTransfer,
-                onNavigateToBankTransfer = onNavigateToBankTransfer,
-                isMyTurn = isMyTurn,
-                isHost = isHost
-            )
-        }
-    }
-}
 
 @Composable
 fun WaitingRoomScreen(
