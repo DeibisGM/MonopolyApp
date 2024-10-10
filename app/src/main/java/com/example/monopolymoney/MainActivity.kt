@@ -20,6 +20,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.monopolymoney.data.GameRoom
+import com.example.monopolymoney.presentation.GameEndScreen
 import com.example.monopolymoney.presentation.LobbyScreen
 import com.example.monopolymoney.presentation.MoneyTransferScreen
 import com.example.monopolymoney.presentation.SettingsScreen
@@ -61,6 +63,18 @@ fun MonopolyApp(navController: NavHostController, viewModel: DataViewModel) {
     val authState by viewModel.authState.collectAsState()
     val user by viewModel.user.collectAsState()
     val registrationState by viewModel.authViewModel.registrationState.collectAsState()
+    val showGameOverScreen by viewModel.showGameOverScreen.collectAsState()
+
+    val shouldNavigateToMain by viewModel.shouldNavigateToMain.collectAsState()
+
+    LaunchedEffect(shouldNavigateToMain) {
+        if (shouldNavigateToMain) {
+            navController.navigate("main") {
+                popUpTo("main") { inclusive = true }
+            }
+            viewModel.resetNavigation()
+        }
+    }
 
     LaunchedEffect(authState, registrationState) {
         when {
@@ -88,7 +102,6 @@ fun MonopolyApp(navController: NavHostController, viewModel: DataViewModel) {
         }
     }
 
-
     NavHost(navController = navController, startDestination = "auth") {
         composable("auth") {
             AuthScreen(viewModel = viewModel.authViewModel)
@@ -99,22 +112,31 @@ fun MonopolyApp(navController: NavHostController, viewModel: DataViewModel) {
         }
 
         composable("main") {
-            val players by viewModel.players.collectAsState()
-            val currentPlayer by viewModel.currentPlayer.collectAsState()
-            val roomCode by viewModel.roomCode.collectAsState()
-            val hostId by viewModel.hostId.collectAsState()
-
-            if (user != null) {
-                LobbyScreen(
-                    viewModel = viewModel,
-                    onNavigateToMoneyTransfer = { navController.navigate("moneyTransfer") },
-                    onNavigateToBankTransfer = { navController.navigate("bankTransfer") },
-                    onNavigateToSettings = { navController.navigate("settings") }
-                )
-            } else {
-                LaunchedEffect(Unit) {
-                    navController.navigate("auth") {
-                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+            when {
+                showGameOverScreen -> {
+                    GameEndScreen(
+                        viewModel = viewModel,
+                        onNavigateToHome = {
+                            viewModel.leaveGameOverScreen()
+                        }
+                    )
+                }
+                user != null -> {
+                    LobbyScreen(
+                        viewModel = viewModel,
+                        onNavigateToMoneyTransfer = { navController.navigate("moneyTransfer") },
+                        onNavigateToBankTransfer = { navController.navigate("bankTransfer") },
+                        onNavigateToSettings = { navController.navigate("settings") },
+                        onNavigateToHome = {
+                            viewModel.leaveGameOverScreen()
+                        }
+                    )
+                }
+                else -> {
+                    LaunchedEffect(Unit) {
+                        navController.navigate("auth") {
+                            popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                        }
                     }
                 }
             }

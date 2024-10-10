@@ -1,13 +1,13 @@
 package com.example.monopolymoney.data
 
-import com.google.firebase.Firebase
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
-import com.google.firebase.database.database
 import com.google.firebase.database.getValue
+import com.google.firebase.database.ktx.database
+import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -54,9 +54,6 @@ data class User(
     val profileImageResId: Int = 0,
     val isEmailVerified: Boolean = false
 ) {
-    // Constructor sin argumentos requerido para Firebase
-    constructor() : this("", "", "", 0)
-
     fun toMap(): Map<String, Any?> {
         return mapOf(
             "uuid" to uuid,
@@ -157,12 +154,9 @@ sealed class GameEvent {
                     timestamp = (map["timestamp"] as? Number)?.toLong() ?: System.currentTimeMillis()
                 )
                 else -> null
-
             }
         }
     }
-
-
 }
 
 data class GameRoom(

@@ -26,7 +26,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.monopolymoney.R
 import com.example.monopolymoney.viewmodel.AuthViewModel
-import com.example.monopolymoney.viewmodel.DataViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
