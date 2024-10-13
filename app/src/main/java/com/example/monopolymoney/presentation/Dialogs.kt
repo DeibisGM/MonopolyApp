@@ -3,13 +3,30 @@ package com.example.monopolymoney.presentation
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.example.monopolymoney.viewmodel.DataViewModel
+import com.example.monopolymoney.viewmodel.AuthViewModel
 
 @Composable
 fun CreateRoomDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
@@ -109,7 +126,111 @@ fun ExitGameDialog(
     }
 }
 
-fun handleAction(context: android.content.Context, condition: Boolean, action: () -> Unit, message: String = "It's not your turn yet!") {
+fun handleAction(
+    context: android.content.Context,
+    condition: Boolean,
+    action: () -> Unit,
+    message: String = "It's not your turn yet!"
+) {
     if (condition) action()
     else Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+}
+
+@Composable
+fun ErrorDialog(
+    errorMessage: String,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Aceptar")
+            }
+        },
+        title = {
+            Text("Error")
+        },
+        text = {
+            Text(errorMessage)
+        }
+    )
+}
+
+@Composable
+fun ResetEmailSentDialog(
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Aceptar")
+            }
+        },
+        title = {
+            Text("Correo enviado")
+        },
+        text = {
+            Text("Se ha enviado un correo para restablecer la contraseña.")
+        }
+    )
+}
+@Composable
+fun ForgotPasswordDialog(
+    isLoggedIn: Boolean, // Nuevo parámetro
+    onDismiss: () -> Unit,
+    onSendResetEmail: (String) -> Unit
+) {
+    var email by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Restablecer Contraseña", style = MaterialTheme.typography.titleLarge) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+
+                // Mensaje condicional basado en el valor de `isLoggedIn`
+                Text(
+
+                    text = if (isLoggedIn) {
+                        "Se enviará un enlace a tu correo. Tu sesión se cerrará para que puedas iniciar sesión con la nueva contraseña."
+                    } else {
+                        "Por favor, ingresa tu correo electrónico para recibir un enlace de restablecimiento de contraseña."
+                    },
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                TextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Correo electrónico") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Email)
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSendResetEmail(email) },
+                enabled = email.isNotBlank(),
+                modifier = Modifier.padding(8.dp)
+            ) {
+                Text("Enviar Enlace")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.padding(8.dp)
+            ) {
+                Text("Cancelar")
+            }
+        },
+        shape = RoundedCornerShape(16.dp)
+    )
 }

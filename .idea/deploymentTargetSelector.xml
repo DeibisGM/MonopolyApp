@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2024-10-10T14:47:09.455343700Z">
+        <DropdownSelection timestamp="2024-10-12T05:58:46.639476200Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\User\.android\avd\Pixel_6_API_34.avd" />
+              <DeviceId pluginId="Default" identifier="serial=192.168.0.190:5555;connection=b109455d" />
             </handle>
           </Target>
         </DropdownSelection>
@@ -15,7 +15,7 @@
           <targets>
             <Target type="DEFAULT_BOOT">
               <handle>
-                <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\User\.android\avd\Pixel_6_API_34.avd" />
+                <DeviceId pluginId="Default" identifier="serial=192.168.0.190:5555;connection=b109455d" />
               </handle>
             </Target>
             <Target type="DEFAULT_BOOT">
@@ -25,6 +25,9 @@
             </Target>
           </targets>
         </DialogSelection>
+      </SelectionState>
+      <SelectionState runConfigName="LoadingScreenPreview">
+        <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
     </selectionStates>
   </component>

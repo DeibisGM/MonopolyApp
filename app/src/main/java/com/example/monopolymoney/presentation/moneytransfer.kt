@@ -27,12 +27,9 @@ private val DarkColorScheme = darkColorScheme(
     onSurface = Color.White
 )
 
-private val LightGrey = Color(0xFFB0B0B0)
-private val green = Color(0xFF57D55B)
-
 @Composable
 fun MoneyTransferScreen(
-    players: Map<String, Player>, // Cambiado a Map
+    players: Map<String, Player>,
     myPlayerId: String,
     onTransactionComplete: (amount: Int, toPlayerId: String) -> Unit,
     onCancel: () -> Unit,
@@ -41,228 +38,195 @@ fun MoneyTransferScreen(
     isMyTurn: Boolean = false
 ) {
     var amount by remember { mutableStateOf("0") }
-    var isInitialValue by remember { mutableStateOf(true) }
     var selectedRecipient by remember { mutableStateOf<Player?>(null) }
     var showErrorDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
 
-    // Find the current player object using map
     val currentPlayerObject = players[myPlayerId]
-
-    // Determine if the transaction should be allowed
-    val canMakeTransaction = when {
-        isBankMode -> isHost
-        else -> isMyTurn
-    }
-
-    // Filter recipients based on mode and permissions
-    val availableRecipients = when {
-        isBankMode -> players.values.toList() // Bank can transfer to anyone, including self
-        else -> players.values.filter { it.id != myPlayerId } // Can't transfer to self in normal mode
-    }
+    val canMakeTransaction = if (isBankMode) isHost else isMyTurn
+    val availableRecipients = if (isBankMode) players.values.toList() else players.values.filter { it.id != myPlayerId }
 
     MaterialTheme(colorScheme = DarkColorScheme) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .systemBarsPadding()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background)
-            ) {
-                Column(modifier = Modifier.padding(8.dp)) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    TopBar(onCancel = onCancel, isBankMode = isBankMode)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    RecipientSelector(
-                        selectedRecipient = selectedRecipient,
-                        players = availableRecipients,
-                        enabled = canMakeTransaction,
-                        onRecipientSelected = { selectedRecipient = it }
-                    )
-                    Spacer(modifier = Modifier.height(25.dp))
-                    AmountDisplay(amount)
+            TransactionCard(
+                amount = amount,
+                selectedRecipient = selectedRecipient,
+                players = availableRecipients,
+                canMakeTransaction = canMakeTransaction,
+                onRecipientSelected = { selectedRecipient = it },
+                onCancel = onCancel
+            )
+
+            BottomSection(
+                currentPlayerObject = currentPlayerObject,
+                isBankMode = isBankMode,
+                amount = amount,
+                onAmountChange = { amount = it },
+                canMakeTransaction = canMakeTransaction,
+                selectedRecipient = selectedRecipient,
+                onTransactionComplete = onTransactionComplete,
+                showErrorDialog = showErrorDialog,
+                errorMessage = errorMessage,
+                onErrorDismiss = { showErrorDialog = false },
+                onTransactionError = { error ->
+                    errorMessage = error
+                    showErrorDialog = true
                 }
-            }
-
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.Transparent),
-                    shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF252525))
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        if (isBankMode) {
-                            Text(
-                                "Bank Balance: Unlimited",
-                                color = Color.White,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(16.dp)
-                            )
-                        } else {
-                            currentPlayerObject?.let {
-                                PaymentSourceCard(it.balance)
-                            }
-                        }
-
-                        NumberPad(
-                            onNumberClick = { digit ->
-                                if (isInitialValue) {
-                                    amount = ""
-                                    isInitialValue = false
-                                }
-                                if (amount.length < 6) amount += digit
-                            },
-                            onDeleteClick = {
-                                if (amount.isNotEmpty()) {
-                                    amount = amount.dropLast(1)
-                                }
-                                if (amount.isEmpty()) {
-                                    amount = "0"
-                                    isInitialValue = true
-                                }
-                            }
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        SendButton(
-                            enabled = canMakeTransaction && selectedRecipient != null && amount.toIntOrNull() ?: 0 > 0,
-                            onSendMoney = {
-                                handleTransaction(
-                                    currentPlayerObject,
-                                    selectedRecipient,
-                                    amount.toIntOrNull() ?: 0,
-                                    onTransactionComplete,
-                                    isBankMode
-                                ) { error ->
-                                    errorMessage = error
-                                    showErrorDialog = true
-                                }
-                            },
-                            isBankMode = isBankMode
-                        )
-
-                        if (!canMakeTransaction) {
-                            Text(
-                                text = if (isBankMode) "Only the host can make bank transfers"
-                                else "You can only make transfers during your turn",
-                                color = Color.Red,
-                                modifier = Modifier.padding(top = 8.dp)
-                            )
-                        }
-
-                        if (showErrorDialog) {
-                            AlertDialog(
-                                onDismissRequest = { showErrorDialog = false },
-                                title = { Text("Transaction Failed") },
-                                text = { Text(errorMessage) },
-                                confirmButton = {
-                                    Button(onClick = { showErrorDialog = false }) {
-                                        Text("OK")
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-            }
+            )
         }
     }
 }
 
-
 @Composable
-fun RecipientSelector(
+fun BottomSection(
+    currentPlayerObject: Player?,
+    isBankMode: Boolean,
+    amount: String,
+    onAmountChange: (String) -> Unit,
+    canMakeTransaction: Boolean,
     selectedRecipient: Player?,
-    players: List<Player>, // Sigue siendo lista ya que Dropdown muestra lista
-    enabled: Boolean,
-    onRecipientSelected: (Player) -> Unit
+    onTransactionComplete: (Int, String) -> Unit,
+    showErrorDialog: Boolean,
+    errorMessage: String,
+    onErrorDismiss: () -> Unit,
+    onTransactionError: (String) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Button(
-            onClick = { if (enabled) expanded = true },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (enabled) Color(0xFF363636) else Color(0xFF262626),
-                contentColor = if (enabled) Color.White else Color.Gray
-            ),
-            shape = RoundedCornerShape(8.dp),
-            enabled = enabled
-        ) {
-            Text(
-                selectedRecipient?.name ?: "Select Recipient",
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Start,
-                fontSize = 18.sp
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Transparent),
+        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF252525))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            DisplayBalance(isBankMode, currentPlayerObject)
+            NumberPad(
+                onNumberClick = { digit ->
+                    val newAmount = if (amount == "0") digit else amount + digit
+                    onAmountChange(newAmount)
+                },
+                onDeleteClick = {
+                    val newAmount = amount.dropLast(1)
+                    onAmountChange(newAmount.ifEmpty { "0" })
+                }
             )
-        }
+            Spacer(modifier = Modifier.height(16.dp))
+            SendButton(
+                enabled = canMakeTransaction && selectedRecipient != null && (amount.toIntOrNull()
+                    ?: 0) > 0,
+                onSendMoney = {
+                    selectedRecipient?.id?.let { recipientId ->
+                        onTransactionComplete(amount.toInt(), recipientId)
+                    } ?: onTransactionError("Invalid recipient")
+                },
+                isBankMode = isBankMode
+            )
 
-        DropdownMenu(
-            expanded = expanded && enabled,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF363636))
-        ) {
-            players.forEach { player ->
-                DropdownMenuItem(
-                    text = { player.name?.let { Text(it, color = Color.White) } },
-                    onClick = {
-                        onRecipientSelected(player)
-                        expanded = false
-                    },
-                    colors = MenuDefaults.itemColors(
-                        textColor = Color.White
-                    )
+            if (showErrorDialog) {
+                AlertDialog(
+                    onDismissRequest = onErrorDismiss,
+                    title = { Text("Transaction Failed") },
+                    text = { Text(errorMessage) },
+                    confirmButton = {
+                        Button(onClick = onErrorDismiss) {
+                            Text("OK")
+                        }
+                    }
                 )
             }
         }
     }
 }
 
-private fun handleTransaction(
-    currentPlayer: Player?,
+@Composable
+fun TransactionCard(
+    amount: String,
     selectedRecipient: Player?,
-    amount: Int,
-    onTransactionComplete: (amount: Int, toPlayerId: String) -> Unit,
-    isBankMode: Boolean,
-    onError: (String) -> Unit
+    players: List<Player>,
+    canMakeTransaction: Boolean,
+    onRecipientSelected: (Player) -> Unit,
+    onCancel: () -> Unit
 ) {
-    if (selectedRecipient == null) {
-        onError("Please select a recipient.")
-        return
-    }
-
-    if (amount <= 0) {
-        onError("Please enter a valid amount.")
-        return
-    }
-
-    if (!isBankMode) {
-        if (currentPlayer == null) {
-            onError("Current player not found.")
-            return
-        }
-
-        if (amount > currentPlayer.balance) {
-            onError("Insufficient funds. Your balance is $${currentPlayer.balance}.")
-            return
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background)
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            TopBar(onCancel = onCancel, isBankMode = false)
+            Spacer(modifier = Modifier.height(16.dp))
+            RecipientSelector(
+                selectedRecipient = selectedRecipient,
+                players = players,
+                enabled = canMakeTransaction,
+                onRecipientSelected = onRecipientSelected
+            )
+            Spacer(modifier = Modifier.height(25.dp))
+            AmountDisplay(amount)
         }
     }
+}
 
-    selectedRecipient.id?.let { onTransactionComplete(amount, it) }
+@Composable
+fun DisplayBalance(isBankMode: Boolean, currentPlayerObject: Player?) {
+    Text(
+        text = if (isBankMode) "Bank Balance: Unlimited" else "Balance: $${currentPlayerObject?.balance ?: 0}",
+        color = Color.White,
+        fontSize = 22.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(16.dp)
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RecipientSelector(
+    selectedRecipient: Player?,
+    players: List<Player>,
+    enabled: Boolean,
+    onRecipientSelected: (Player) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { if (enabled) expanded = !expanded }
+    ) {
+        OutlinedTextField(
+            value = selectedRecipient?.name ?: "Select Recipient",
+            onValueChange = {},
+            readOnly = true,
+            enabled = enabled,
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(),
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
+                disabledTextColor = if (enabled) Color.White else Color.Gray
+            )
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            players.forEach { player ->
+                DropdownMenuItem(
+                    text = { Text(player.name ?: "", color = Color.White) },
+                    onClick = {
+                        onRecipientSelected(player)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -288,56 +252,6 @@ fun TopBar(onCancel: () -> Unit, isBankMode: Boolean) {
 }
 
 @Composable
-fun RecipientSelector(selectedRecipient: Player?, players: List<Player>, onRecipientSelected: (Player) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Button(
-            onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF363636),
-                contentColor = Color.White
-            ),
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Text(
-                selectedRecipient?.name ?: "Select Recipient",
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Start,
-                fontSize = 18.sp
-            )
-//            Icon(
-//                imageVector = Icons.Filled.ArrowDropDown,
-//                contentDescription = "Dropdown Arrow"
-//            )
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF363636))
-        ) {
-            players.forEach { player ->
-                DropdownMenuItem(
-                    text = { player.name?.let { Text(it, color = Color.White) } },
-                    onClick = {
-                        onRecipientSelected(player)
-                        expanded = false
-                    },
-                    colors = MenuDefaults.itemColors(
-                        textColor = Color.White
-                    )
-                )
-            }
-        }
-    }
-}
-
-
-@Composable
 fun AmountDisplay(amount: String) {
     Text(
         "$$amount",
@@ -351,27 +265,6 @@ fun AmountDisplay(amount: String) {
     )
 }
 
-// Muestra el balance del jugador actual
-@Composable
-fun PaymentSourceCard(balance: Int) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.Transparent),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            "Balance: $$balance",
-            color = Color.White,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth()
-        )
-    }
-}
-
 @Composable
 fun NumberPad(onNumberClick: (String) -> Unit, onDeleteClick: () -> Unit) {
     val numbers = listOf(
@@ -381,9 +274,7 @@ fun NumberPad(onNumberClick: (String) -> Unit, onDeleteClick: () -> Unit) {
         listOf("000", "0", "⌫")
     )
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         numbers.forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -392,13 +283,12 @@ fun NumberPad(onNumberClick: (String) -> Unit, onDeleteClick: () -> Unit) {
                 row.forEach { number ->
                     Button(
                         onClick = {
-                            if (number == "⌫") onDeleteClick()
-                            else onNumberClick(number)
+                            if (number == "⌫") onDeleteClick() else onNumberClick(number)
                         },
                         modifier = Modifier
                             .weight(1f)
                             .padding(5.dp)
-                            .height(55.dp), // Increased height
+                            .height(55.dp),
                         shape = ButtonShape,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.secondary,
@@ -423,7 +313,7 @@ fun SendButton(enabled: Boolean, onSendMoney: () -> Unit, isBankMode: Boolean) {
         enabled = enabled,
         shape = ButtonShape,
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (enabled) green else MaterialTheme.colorScheme.secondary,
+            containerColor = if (enabled) Color(0xFF57D55B) else MaterialTheme.colorScheme.secondary,
             contentColor = Color.White
         )
     ) {

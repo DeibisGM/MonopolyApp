@@ -3,13 +3,34 @@ package com.example.monopolymoney.presentation
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,30 +60,48 @@ fun GameScreen(
 ) {
     val context = LocalContext.current
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF141F23))
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier
-                    .padding(GeneralPadding)
-                    .weight(1f)
-            ) {
-                TopSection(viewModel)
-                Spacer(modifier = Modifier.height(20.dp))
-                EventLogSection(modifier = Modifier.weight(1f), viewModel = viewModel)
+    SystemAwareScreen(backgroundColor = Color(0xFF16252B)) {
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .systemBarsPadding() // Aplica el padding solo al contenido
+                .background(Color(0xFF141F23))
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier
+                        .padding(GeneralPadding)
+                        .weight(1f)
+                ) {
+                    TopSection(viewModel)
+                    Spacer(modifier = Modifier.height(20.dp))
+                    EventLogSection(modifier = Modifier.weight(1f), viewModel = viewModel)
+                }
+                BottomButtonsSection(
+                    modifier = Modifier.fillMaxWidth(),
+                    onNavigateToMoneyTransfer = {
+                        handleAction(
+                            context,
+                            isMyTurn,
+                            onNavigateToMoneyTransfer
+                        )
+                    },
+                    onNavigateToBankTransfer = {
+                        handleAction(
+                            context,
+                            isHost,
+                            onNavigateToBankTransfer,
+                            "Only the host can make bank transfers!"
+                        )
+                    },
+                    onEndTurn = { handleAction(context, isMyTurn, viewModel::endTurn) },
+                    isMyTurn = isMyTurn,
+                    isHost = isHost
+                )
             }
-            BottomButtonsSection(
-                modifier = Modifier.fillMaxWidth(),
-                onNavigateToMoneyTransfer = { handleAction(context, isMyTurn, onNavigateToMoneyTransfer) },
-                onNavigateToBankTransfer = { handleAction(context, isHost, onNavigateToBankTransfer, "Only the host can make bank transfers!") },
-                onEndTurn = { handleAction(context, isMyTurn, viewModel::endTurn) },
-                isMyTurn = isMyTurn,
-                isHost = isHost
-            )
         }
+
     }
 }
 
@@ -209,6 +248,7 @@ fun EventList(gameEvents: List<GameEvent>, players: Map<String, Player>) {
                 is GameEvent.TransactionEvent -> TransactionEventCard(event, players)
                 is GameEvent.PlayerJoinRoomEvent -> PlayerJoinEventCard(event)
                 is GameEvent.PlayerLeftEvent -> PlayerLeftEventCard(event)
+
                 is GameEvent.GameEndedEvent -> {} // Handle game ended event if needed
             }
         }
@@ -217,9 +257,14 @@ fun EventList(gameEvents: List<GameEvent>, players: Map<String, Player>) {
 
 @Composable
 fun TransactionEventCard(transaction: GameEvent.TransactionEvent, players: Map<String, Player>) {
-    val fromUser = if (transaction.fromPlayerId == "-1") "Bank" else players[transaction.fromPlayerId]?.name ?: "Unknown"
-    val toUser = if (transaction.toPlayerId == "-1") "Bank" else players[transaction.toPlayerId]?.name ?: "Unknown"
-    val avatarResId = players[transaction.fromPlayerId]?.profileImageResId ?: R.drawable.default_avatar
+    val fromUser =
+        if (transaction.fromPlayerId == "-1") "Bank" else players[transaction.fromPlayerId]?.name
+            ?: "Unknown"
+    val toUser =
+        if (transaction.toPlayerId == "-1") "Bank" else players[transaction.toPlayerId]?.name
+            ?: "Unknown"
+    val avatarResId =
+        players[transaction.fromPlayerId]?.profileImageResId ?: R.drawable.default_avatar
 
     Row(
         modifier = Modifier.fillMaxWidth(),

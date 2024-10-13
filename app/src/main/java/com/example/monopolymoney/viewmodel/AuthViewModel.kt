@@ -30,8 +30,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
-    private val database: DatabaseReference = FirebaseDatabase.getInstance().reference.child("users")
-    private val sharedPreferences: SharedPreferences = application.getSharedPreferences("UserCredentials", Context.MODE_PRIVATE)
+    private val database: DatabaseReference =
+        FirebaseDatabase.getInstance().reference.child("users")
+    private val sharedPreferences: SharedPreferences =
+        application.getSharedPreferences("UserCredentials", Context.MODE_PRIVATE)
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Unauthenticated)
     val authState: StateFlow<AuthState> = _authState
@@ -46,30 +48,42 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         verifyStoredCredentials()
     }
 
+    fun resetAuthState() {
+        _authState.value = AuthState.Unauthenticated
+        _registrationState.value = RegistrationState.None
+        _user.value = null
+        clearUserCredentials()
+    }
 
-    private fun verifyStoredCredentials() {
+    fun verifyStoredCredentials() {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             val storedUuid = sharedPreferences.getString("uuid", null)
-            val isEmailVerified = sharedPreferences.getBoolean("isEmailVerified", false)
 
             if (storedUuid != null) {
                 try {
-                    val user = getUserFromDatabase(storedUuid)
-                    if (user != null && (isEmailVerified || auth.currentUser?.isEmailVerified == true)) {
-                        _user.value = user
+                    val firebaseUser = auth.currentUser
+                    if (firebaseUser != null) {
+                        // Recargar el usuario para obtener el estado de verificación más reciente
+                        firebaseUser.reload().await()
 
-                        if (!user.isEmailVerified) {
-                            _registrationState.value = RegistrationState.EmailVerificationSent
-                        } else if (user.name.isBlank() || user.profileImageResId == 0) {
-                            _registrationState.value = RegistrationState.NeedsProfile
+                        val user = getUserFromDatabase(storedUuid)
+                        if (user != null) {
+                            _user.value = user
+
+                            if (!firebaseUser.isEmailVerified) {
+                                _registrationState.value = RegistrationState.EmailVerificationSent
+                                _authState.value = AuthState.Authenticated(firebaseUser)
+                            } else if (user.name.isBlank() || user.profileImageResId == 0) {
+                                _registrationState.value = RegistrationState.NeedsProfile
+                                _authState.value = AuthState.Authenticated(firebaseUser)
+                            } else {
+                                _registrationState.value = RegistrationState.Complete
+                                _authState.value = AuthState.Authenticated(firebaseUser)
+                            }
                         } else {
-                            _registrationState.value = RegistrationState.Complete
+                            handleInvalidCredentials()
                         }
-
-                        auth.currentUser?.let { firebaseUser ->
-                            _authState.value = AuthState.Authenticated(firebaseUser)
-                        } ?: handleSilentAuth(storedUuid)
                     } else {
                         handleInvalidCredentials()
                     }
@@ -108,10 +122,14 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 when (e) {
                     is FirebaseAuthWeakPasswordException ->
-                        _authState.value = AuthState.Error("Password should be at least 6 characters")
+                        _authState.value =
+                            AuthState.Error("Password should be at least 6 characters")
+
                     is FirebaseAuthInvalidCredentialsException ->
                         _authState.value = AuthState.Error("Current password is incorrect")
-                    else -> _authState.value = AuthState.Error(e.message ?: "Failed to change password")
+
+                    else -> _authState.value =
+                        AuthState.Error(e.message ?: "Failed to change password")
                 }
             }
         }
@@ -154,18 +172,24 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val authResult = auth.signInWithEmailAndPassword(email, password).await()
                 val firebaseUser = authResult.user
                 if (firebaseUser != null) {
+                    // Recargar el usuario para obtener el estado de verificación más reciente
+                    firebaseUser.reload().await()
+
                     val user = getUserFromDatabase(firebaseUser.uid)
                     if (user != null) {
                         _user.value = user
                         saveUserUuid(firebaseUser.uid)
 
-                        if (user.name.isBlank() || user.profileImageResId == 0) {
+                        if (!firebaseUser.isEmailVerified) {
+                            _registrationState.value = RegistrationState.EmailVerificationSent
+                            _authState.value = AuthState.Authenticated(firebaseUser)
+                        } else if (user.name.isBlank() || user.profileImageResId == 0) {
                             _registrationState.value = RegistrationState.NeedsProfile
+                            _authState.value = AuthState.Authenticated(firebaseUser)
                         } else {
                             _registrationState.value = RegistrationState.Complete
+                            _authState.value = AuthState.Authenticated(firebaseUser)
                         }
-
-                        _authState.value = AuthState.Authenticated(firebaseUser)
                     } else {
                         _authState.value = AuthState.Error("User data not found")
                     }
@@ -256,7 +280,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     _registrationState.value = RegistrationState.EmailVerificationSent
                 }
             } catch (e: Exception) {
-                _authState.value = AuthState.Error(e.message ?: "Failed to resend verification email")
+                _authState.value =
+                    AuthState.Error(e.message ?: "Failed to resend verification email")
             }
         }
     }
@@ -282,7 +307,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 _user.value?.let { currentUser ->
                     val updatedUser = currentUser.copy(
                         name = name,
-                        profileImageResId = profileImageResId
+                        profileImageResId = profileImageResId,
+                        isEmailVerified = true
                     )
 
                     // Update in database
