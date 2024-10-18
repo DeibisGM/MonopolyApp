@@ -51,7 +51,8 @@ class MainActivity : ComponentActivity() {
             MonopolyMoneyTheme {
                 Box(modifier = Modifier.fillMaxSize().background(MyColors.background)) {
                     val navController = rememberNavController()
-                    MonopolyApp(navController, viewModel)
+                    LoadingScreen()
+                    //MonopolyApp(navController, viewModel)
                 }
             }
         }
